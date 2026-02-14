@@ -90,6 +90,9 @@ io.on('connection', socket => {
         emit(socket.id, 'PHASE_CHANGE', { phase: room.gameState.phase, gameState: pub(room.gameState) });
         appendLog(code, `✅ ${playerName} đã quay lại!`);
         toRoom(code, 'STATE_UPDATE', { gameState: pub(room.gameState) });
+      } else {
+        // Player in room.players but not in gameState.players - this shouldn't happen
+        return emit(socket.id, 'ERR', { msg: 'Lỗi khôi phục game.' });
       }
     } else {
       // Game hasn't started yet - show room screen
