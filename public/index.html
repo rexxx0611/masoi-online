@@ -225,7 +225,7 @@ button,input,select,textarea{font-family:var(--font);}
     </div>
     <button class="btn-s" id="btn-join">🚪 Tham Gia Phòng</button>
   </div>
-  <div class="hint">💡 Chia sẻ mã phòng để bạn bè tham gia từ bất kỳ thiết bị — Safari, Chrome đều chơi được!</div>
+  <div class="hint">💡 Chia sẻ mã phòng để bạn bè tham gia từ bất kỳ thiết bị — Safari, Chrome đều chơi được! — Game này được code bởi rex dep trai ^^</div>
 </div>
 
 <!-- ROOM -->
@@ -602,16 +602,44 @@ function onGridClick(e) {
 document.addEventListener('touchstart', () => { _touchScrolled = false; }, { passive:true });
 
 // ----------------------------------------------------------------
+//  STORAGE & SESSION
+// ----------------------------------------------------------------
+function saveSession(code, playerName, avatar) {
+  localStorage.setItem('masoi_session', JSON.stringify({ code, playerName, avatar, timestamp: Date.now() }));
+}
+function clearSession() {
+  localStorage.removeItem('masoi_session');
+}
+function getSession() {
+  const s = localStorage.getItem('masoi_session');
+  if (!s) return null;
+  try {
+    const sess = JSON.parse(s);
+    // Only restore if within 5 minutes
+    if (Date.now() - sess.timestamp > 5 * 60 * 1000) return null;
+    return sess;
+  } catch(e) { return null; }
+}
+
+// ----------------------------------------------------------------
 //  SOCKET
 // ----------------------------------------------------------------
 function initSocket() {
   socket = io({ transports:['websocket','polling'] });
-  socket.on('connect',    () => { myId = socket.id; });
+  socket.on('connect',    () => { 
+    myId = socket.id;
+    // Try to reconnect to previous session if exists
+    const sess = getSession();
+    if (sess && !currentCode) {
+      socket.emit('RECONNECT', { code: sess.code, playerName: sess.playerName });
+    }
+  });
   socket.on('disconnect', () => notify('Mất kết nối server!','err'));
   socket.on('ERR',         d => notify(d.msg,'err'));
 
   socket.on('ROOM_JOINED', d => {
-    currentCode=d.code; myId=d.me.id; isHost=d.me.isHost;
+    currentCode=d.code; myId=d.me.id; isHost=d.me.isHost; myName=d.me.name; myAvatar=d.me.avatar;
+    saveSession(d.code, d.me.name, d.me.avatar);
     updateRoomUI(d.room); showScreen('room');
     if(isHost) setupConfig();
   });
@@ -675,7 +703,7 @@ function joinRoom(){
   myName=name; myAvatar=AVATARS[name.charCodeAt(0)%AVATARS.length];
   socket.emit('JOIN_ROOM',{code,name,avatar:myAvatar});
 }
-function leaveRoom(){ socket.disconnect(); socket.connect(); gameState=null; myRole=null; isHost=false; clearTimerUI(); showScreen('lobby'); }
+function leaveRoom(){ clearSession(); socket.disconnect(); socket.connect(); gameState=null; myRole=null; isHost=false; clearTimerUI(); showScreen('lobby'); }
 function leaveGame(){ if(confirm('Bạn có chắc muốn thoát?')) leaveRoom(); }
 function copyCode(){
   if(navigator.clipboard) navigator.clipboard.writeText(currentCode).catch(()=>{});
@@ -1024,7 +1052,7 @@ function showEndScreen(d){
   if(st){ st.textContent = d.playAgain && d.playAgain.length ? `${d.playAgain.length} người đã chọn chơi lại` : '' }
   showScreen('end');
 }
-function returnToLobby(){ gameState=null; myRole=null; clearTimerUI(); showScreen('lobby'); }
+function returnToLobby(){ clearSession(); gameState=null; myRole=null; clearTimerUI(); showScreen('lobby'); }
 
 // ----------------------------------------------------------------
 //  UTILS
