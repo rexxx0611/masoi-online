@@ -257,6 +257,13 @@ button,input,select,textarea{font-family:var(--font);}
           <option value="300">5 phút</option>
         </select>
       </div>
+      <div class="role-item" style="border-color:rgba(200,151,58,.12);cursor:default;">
+        <span class="rname">🧪 Số bình của Phù Thủy</span>
+        <select id="witch-potions-select" class="time-select">
+          <option value="1">1 bình (mặc định)</option>
+          <option value="2">2 bình</option>
+        </select>
+      </div>
       <button id="start-btn" class="start-btn" disabled>🌙 Bắt đầu</button>
       <div id="start-msg"></div>
     </div>
@@ -341,7 +348,11 @@ button,input,select,textarea{font-family:var(--font);}
     <div id="end-title" class="end-title"></div>
     <div id="end-winners" class="end-winners"></div>
     <div id="end-roles" class="end-roles"></div>
-    <button class="btn-p" id="btn-return" style="max-width:260px;margin:0 auto;display:block">🏠 Về sảnh chờ</button>
+    <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:8px;">
+      <button class="btn-p" id="btn-play-again" style="max-width:220px;">🔁 Chơi lại</button>
+      <button class="btn-p" id="btn-return" style="max-width:220px;">🏠 Về sảnh chờ</button>
+    </div>
+    <div id="play-again-status" style="text-align:center;margin-top:10px;font-size:13px;color:var(--silver)"></div>
   </div>
 </div>
 </div>
@@ -555,6 +566,13 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-vamp-skip').addEventListener('click', () => closeModal('vamp-modal'));
   $('hunter-fire-btn').addEventListener('click', hunterFire);
   $('btn-return').addEventListener('click', returnToLobby);
+  // End screen: play again
+  const pa=document.getElementById('btn-play-again'); if(pa) pa.addEventListener('click', ()=>{
+    if(!currentCode) return notify('Không có mã phòng','err');
+    socket.emit('PLAY_AGAIN',{code:currentCode});
+    pa.disabled=true; pa.textContent='🔁 Đã sẵn sàng';
+    const st=$('play-again-status'); if(st) st.textContent='Bạn đã chọn chơi lại — chờ chủ phòng.';
+  });
 
   // Close modal on backdrop tap
   document.querySelectorAll('.modal-bg').forEach(bg => {
@@ -634,6 +652,12 @@ function initSocket() {
   socket.on('LOG',      d => appendLog(d.msg, d.cls));
   socket.on('CHAT_MSG', d => appendLog(`💬 ${d.from}: ${d.msg}`, 'chat'));
   socket.on('GAME_OVER',d => showEndScreen(d));
+  socket.on('PLAY_AGAIN_UPDATE', d => {
+    // d.ready: array of player names or ids who opted in
+    const st=$('play-again-status'); const pa=$('btn-play-again');
+    if(st) st.textContent = d.msg || (d.ready&&d.ready.length?`${d.ready.length} người đã sẵn sàng chơi lại`:'Chưa ai chọn chơi lại');
+    if(d.youReady && pa){ pa.disabled=true; pa.textContent='🔁 Đã sẵn sàng'; }
+  });
 }
 
 // ----------------------------------------------------------------
@@ -721,7 +745,8 @@ function updateStartBtn(np){
 
 function startGame(){
   if(!isHost) return;
-  socket.emit('START_GAME',{code:currentCode,roleConfig,discussTime:parseInt($('discuss-time-select').value)||60});
+  const witchPotions = parseInt($('witch-potions-select')?.value)||1;
+  socket.emit('START_GAME',{code:currentCode,roleConfig,discussTime:parseInt($('discuss-time-select').value)||60, witchPotions});
 }
 
 // ----------------------------------------------------------------
@@ -963,6 +988,11 @@ function hunterFire(){} // handled by onclick in showHunterModal
 // ----------------------------------------------------------------
 function sendChat(){
   const inp=$('chat-inp'), msg=inp.value.trim(); if(!msg) return;
+  // Block dead players from chatting during day
+  if(gameState && gameState.phase==='day'){
+    const me=gameState.players.find(p=>p.id===myId);
+    if(me && !me.alive){ notify('Bạn đã chết, không thể chat vào ban ngày.','err'); return; }
+  }
   inp.value='';
   socket.emit('CHAT',{code:currentCode,msg}); // server echoes back to all — no local log
 }
@@ -988,6 +1018,10 @@ function showEndScreen(d){
   $('end-winners').innerHTML=(d.names||[]).map(n=>`<span class="winner-chip">${escH(n)}</span>`).join('');
   const rp=$('end-roles');
   if(d.allPlayers&&rp) rp.innerHTML=d.allPlayers.map(p=>{ const r=ROLES[p.role]; return `<div class="end-player ${p.alive?'':'dead'}"><span>${p.avatar}</span><span style="flex:1">${escH(p.name)}</span><span>${r?r.icon+' '+r.name:''}</span></div>`; }).join('');
+  // Reset play-again UI
+  const pa=$('btn-play-again'), st=$('play-again-status');
+  if(pa){ pa.disabled=false; pa.textContent='🔁 Chơi lại'; }
+  if(st){ st.textContent = d.playAgain && d.playAgain.length ? `${d.playAgain.length} người đã chọn chơi lại` : '' }
   showScreen('end');
 }
 function returnToLobby(){ gameState=null; myRole=null; clearTimerUI(); showScreen('lobby'); }
