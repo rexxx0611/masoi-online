@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<title>🐺 Ma Sói Online</title>
+<style>
+:root{
+  --bg:#0a0a14;--panel:#12121f;--border:rgba(255,255,255,.08);
+  --gold:#C8973A;--silver:#B0B8C8;--moon:#E8DCC8;
+  --crimson:#DC143C;--night:#1a1430;--wolf:#8B0000;
+  --day:#2a2010;--vote:#1a0a20;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{background:var(--bg);color:var(--moon);font-family:'Georgia',serif;min-height:100vh;overflow-x:hidden;}
+body.night-bg{background:var(--night);}
+
+/* ---- SCREENS ---- */
+.screen{display:none;min-height:100vh;}
+.screen.active{display:flex;flex-direction:column;align-items:center;}
+
+/* ---- LOBBY ---- */
+#scr-lobby{justify-content:center;padding:20px;background:radial-gradient(ellipse at 50% 20%,rgba(200,151,58,.12) 0%,transparent 60%),var(--bg);}
+.moon-svg{width:100px;height:100px;margin-bottom:10px;filter:drop-shadow(0 0 20px rgba(200,151,58,.4));}
+.title{font-size:clamp(36px,8vw,56px);letter-spacing:.3em;color:var(--gold);font-family:'Georgia',serif;text-shadow:0 0 30px rgba(200,151,58,.5);}
+.subtitle{font-size:13px;color:var(--silver);letter-spacing:.2em;margin-bottom:28px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:28px 24px;width:100%;max-width:420px;}
+.card h2{font-size:16px;color:var(--gold);letter-spacing:.1em;margin-bottom:20px;text-align:center;}
+.ig{margin-bottom:14px;}
+.lbl{display:block;font-size:11px;color:var(--silver);letter-spacing:.1em;margin-bottom:6px;}
+.inp{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:12px 14px;color:var(--moon);font-size:16px;outline:none;transition:border .2s;}
+.inp:focus{border-color:rgba(200,151,58,.5);}
+.inp-code{text-transform:uppercase;letter-spacing:.3em;text-align:center;font-size:20px;font-weight:700;}
+.btn-p{width:100%;background:linear-gradient(135deg,#8B0000,#C41E3A);border:none;border-radius:10px;padding:14px;color:var(--moon);font-size:15px;font-family:Georgia,serif;letter-spacing:.08em;cursor:pointer;transition:all .25s;margin-bottom:10px;}
+.btn-p:hover{opacity:.9;transform:translateY(-1px);}
+.btn-p:disabled{opacity:.4;cursor:not-allowed;transform:none;}
+.btn-s{width:100%;background:rgba(200,151,58,.12);border:1px solid rgba(200,151,58,.3);border-radius:10px;padding:12px;color:var(--gold);font-size:14px;font-family:Georgia,serif;cursor:pointer;transition:all .25s;margin-bottom:10px;}
+.btn-s:hover{background:rgba(200,151,58,.2);}
+.divider{text-align:center;color:var(--silver);font-size:12px;margin:10px 0;position:relative;}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:38%;height:1px;background:var(--border);}
+.divider::before{left:0;} .divider::after{right:0;}
+.hint{font-size:11px;color:var(--silver);text-align:center;margin-top:20px;max-width:360px;line-height:1.7;opacity:.7;}
+
+/* ---- ROOM ---- */
+#scr-room{justify-content:flex-start;padding:0;}
+.room-hd{width:100%;display:flex;justify-content:space-between;align-items:center;padding:16px 18px;background:rgba(0,0,0,.4);border-bottom:1px solid var(--border);}
+.code-box{display:flex;flex-direction:column;}
+.code-lbl{font-size:10px;color:var(--silver);letter-spacing:.1em;}
+.code-val{font-size:22px;letter-spacing:.3em;color:var(--gold);font-weight:700;cursor:pointer;}
+.btn-sm{padding:7px 14px;font-size:12px;border-radius:7px;white-space:nowrap;}
+.room-body{display:flex;flex-wrap:wrap;gap:16px;padding:16px;width:100%;max-width:900px;}
+.players-area{flex:1;min-width:220px;}
+.players-area h2{font-size:14px;color:var(--silver);letter-spacing:.1em;margin-bottom:12px;}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:8px;}
+.pcard{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;transition:border .2s;}
+.pcard.host{border-color:rgba(200,151,58,.5);}
+.pcard.me{border-color:rgba(100,180,255,.4);}
+.pavatar{font-size:28px;margin-bottom:4px;}
+.pname{font-size:12px;color:var(--moon);word-break:break-all;}
+.pbadge{font-size:10px;color:var(--silver);margin-top:3px;}
+.cfg-panel{flex:1;min-width:220px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.cfg-panel h3{font-size:13px;color:var(--gold);letter-spacing:.1em;margin-bottom:14px;}
+.role-item{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;margin-bottom:6px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:background .2s;}
+.role-item:hover{background:rgba(200,151,58,.08);}
+.rname{font-size:13px;color:var(--moon);}
+.rcnt{display:flex;align-items:center;gap:10px;}
+.cbtn{background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:5px;color:var(--moon);width:26px;height:26px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;}
+.cbtn:hover{background:rgba(255,255,255,.15);}
+.start-btn{width:100%;background:linear-gradient(135deg,#8B0000,#C41E3A);border:none;border-radius:10px;padding:14px;color:var(--moon);font-size:15px;font-family:Georgia,serif;cursor:pointer;margin-top:14px;transition:all .25s;}
+.start-btn:disabled{opacity:.4;cursor:not-allowed;}
+#start-msg{font-size:11px;color:var(--silver);text-align:center;margin-top:8px;}
+.time-select{background:rgba(10,10,20,.85);border:1px solid rgba(200,151,58,.3);border-radius:6px;color:var(--gold);font-size:13px;padding:4px 8px;cursor:pointer;outline:none;}
+.time-select option{background:#1a1430;color:var(--moon);}
+
+/* ---- GAME ---- */
+#scr-game{justify-content:flex-start;align-items:stretch;padding:0;}
+.game-wrap{display:flex;flex-direction:column;height:100vh;max-height:100vh;}
+.phase-banner{display:flex;align-items:center;gap:12px;padding:12px 16px;transition:background .5s;}
+.phase-banner.night{background:linear-gradient(90deg,rgba(26,10,40,.9),rgba(40,20,60,.9));}
+.phase-banner.day{background:linear-gradient(90deg,rgba(42,32,16,.9),rgba(60,44,20,.9));}
+.phase-banner.vote{background:linear-gradient(90deg,rgba(26,10,20,.9),rgba(60,20,30,.9));}
+.ph-icon{font-size:28px;}
+.ph-info{flex:1;}
+.ph-title{font-size:16px;font-weight:700;color:var(--gold);font-family:Georgia,serif;}
+.ph-sub{font-size:11px;color:var(--silver);}
+.timer{font-size:20px;font-weight:900;color:var(--gold);font-family:monospace;min-width:40px;text-align:right;}
+.timer.warn{color:var(--crimson);animation:pulse .5s ease infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.5;}}
+.exit-btn{background:rgba(139,0,0,.25);border:1px solid rgba(220,20,60,.3);color:var(--crimson);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:14px;font-weight:700;}
+.game-grid{display:flex;flex:1;overflow:hidden;gap:0;}
+.stage{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:10px;}
+.section-hd{font-size:10px;color:var(--silver);letter-spacing:.15em;margin-bottom:6px;padding:0 2px;}
+.gp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px;}
+.gp{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;position:relative;transition:all .2s;}
+.gp.can-target{cursor:pointer;border-color:rgba(220,20,60,.3);}
+.gp.can-target:hover{border-color:var(--crimson);background:rgba(220,20,60,.08);transform:translateY(-2px);}
+.gp.dead{opacity:.4;filter:grayscale(.7);}
+.gp-av{font-size:22px;margin-bottom:3px;}
+.gp-name{font-size:11px;color:var(--moon);word-break:break-all;}
+.gp-role{font-size:10px;color:var(--silver);margin-top:3px;opacity:.6;}
+.vcnt{position:absolute;top:-6px;right:-6px;background:var(--crimson);color:#fff;border-radius:50%;width:20px;height:20px;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.tag-me{font-size:9px;color:#64B4FF;background:rgba(100,180,255,.15);border-radius:3px;padding:1px 4px;margin-left:3px;}
+.dead-sec{margin-top:8px;opacity:.7;}
+.sidebar{width:220px;min-width:180px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:rgba(0,0,0,.2);}
+@media(max-width:600px){.sidebar{width:100%;border-left:none;border-top:1px solid var(--border);max-height:280px;}}
+.my-role-box,.action-box{padding:12px;border-bottom:1px solid var(--border);}
+.my-role-box h4,.action-box h4,.log-box h4{font-size:9px;color:var(--silver);letter-spacing:.2em;margin-bottom:8px;}
+.role-pill{display:flex;gap:10px;align-items:flex-start;}
+.ri-icon{font-size:28px;}
+.ri-name{font-size:13px;font-weight:700;color:var(--gold);font-family:Georgia,serif;}
+.ri-team{font-size:10px;color:var(--silver);margin-top:2px;}
+.ri-ability{font-size:10px;color:var(--silver);margin-top:4px;line-height:1.4;opacity:.8;}
+.action-box{min-height:70px;}
+.dim-text{font-size:12px;color:var(--silver);opacity:.6;}
+.abtn{background:rgba(200,151,58,.15);border:1px solid rgba(200,151,58,.3);border-radius:7px;padding:8px 12px;color:var(--gold);font-size:12px;font-family:Georgia,serif;cursor:pointer;width:100%;margin-bottom:6px;transition:all .2s;}
+.abtn:hover{background:rgba(200,151,58,.25);}
+.abtn.danger{background:rgba(139,0,0,.2);border-color:rgba(220,20,60,.3);color:var(--crimson);}
+.abtn:disabled{opacity:.35;cursor:not-allowed;}
+.log-box{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:10px;}
+.log-scroll{flex:1;overflow-y:auto;font-size:11px;line-height:1.7;}
+.log-scroll::-webkit-scrollbar{width:4px;}
+.log-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.log-line{padding:2px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.log-line.night{color:#8888FF;}
+.log-line.death{color:var(--crimson);}
+.log-line.day{color:#C8973A;}
+.log-line.vote{color:#CC88FF;}
+.log-line.win{color:#88FF88;font-weight:700;}
+.log-line.chat{color:#64B4FF;}
+.log-line.wolf{color:#FF6060;}
+.game-bottom{display:flex;gap:8px;padding:10px;border-top:1px solid var(--border);background:rgba(0,0,0,.3);}
+.chat-inp{flex:1;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--moon);font-size:14px;outline:none;}
+.send-btn{background:rgba(200,151,58,.15);border:1px solid rgba(200,151,58,.3);border-radius:8px;padding:10px 16px;color:var(--gold);cursor:pointer;font-size:13px;font-family:Georgia,serif;white-space:nowrap;}
+.majority-indicator{font-size:11px;color:var(--silver);text-align:center;padding:5px 10px;background:rgba(139,0,0,.15);border:1px solid rgba(220,20,60,.2);border-radius:6px;margin-bottom:8px;}
+
+/* ---- END ---- */
+#scr-end{justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 30%,rgba(200,151,58,.1) 0%,transparent 60%),var(--bg);}
+.end-content{text-align:center;width:100%;max-width:500px;}
+.end-trophy{font-size:80px;display:block;margin-bottom:12px;animation:trophyPop .6s ease;}
+@keyframes trophyPop{0%{transform:scale(0);}80%{transform:scale(1.1);}100%{transform:scale(1);}}
+.end-title{font-size:clamp(18px,4vw,26px);color:var(--gold);font-family:Georgia,serif;margin-bottom:16px;line-height:1.4;}
+.end-winners{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-bottom:20px;}
+.winner-chip{background:rgba(200,151,58,.2);border:1px solid rgba(200,151,58,.4);border-radius:20px;padding:6px 16px;font-size:13px;color:var(--gold);}
+.end-roles{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;text-align:left;}
+.end-player{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px;}
+.end-player:last-child{border-bottom:none;}
+.end-player.dead{opacity:.5;}
+
+/* ---- MODALS ---- */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);}
+.modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:24px 20px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;}
+.modal-icon{font-size:48px;display:block;text-align:center;margin-bottom:8px;}
+.modal h2{font-size:18px;font-family:Georgia,serif;color:var(--gold);text-align:center;margin-bottom:12px;}
+.modal p{font-size:13px;color:var(--silver);line-height:1.6;margin-bottom:12px;text-align:center;}
+.modal-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:14px;}
+.mbtn{padding:11px 22px;border-radius:10px;font-size:14px;font-family:Georgia,serif;cursor:pointer;border:none;transition:all .2s;}
+.mbtn.p{background:linear-gradient(135deg,#8B0000,#C41E3A);color:var(--moon);}
+.mbtn.s{background:rgba(200,151,58,.15);border:1px solid rgba(200,151,58,.3);color:var(--gold);}
+.mbtn:disabled{opacity:.35;cursor:not-allowed;}
+.modal-team{text-align:center;font-size:12px;margin-bottom:10px;font-weight:700;}
+.targets-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:12px 0;max-height:280px;overflow-y:auto;}
+.target-btn{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:10px 8px;color:var(--moon);font-size:13px;cursor:pointer;transition:all .2s;text-align:center;}
+.target-btn:hover{border-color:rgba(200,151,58,.5);background:rgba(200,151,58,.1);}
+.target-btn.sel{border-color:var(--gold);background:rgba(200,151,58,.2);color:var(--gold);font-weight:700;}
+.target-btn:disabled{opacity:.35;cursor:not-allowed;}
+.wolf-pack{font-size:12px;color:#FF9090;text-align:center;margin-bottom:8px;}
+.seer-result{font-size:16px;font-weight:700;text-align:center;padding:16px;border-radius:10px;margin:10px 0;}
+.seer-result.good{background:rgba(50,150,50,.15);color:#88FF88;border:1px solid rgba(100,220,100,.3);}
+.seer-result.evil{background:rgba(150,20,20,.2);color:#FF8888;border:1px solid rgba(220,60,60,.3);}
+
+/* ---- NOTIFY ---- */
+.notif{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 20px;font-size:13px;color:var(--moon);transition:transform .3s ease;z-index:200;white-space:nowrap;max-width:90vw;}
+.notif.show{transform:translateX(-50%) translateY(0);}
+.notif.error{border-color:rgba(220,20,60,.5);color:var(--crimson);}
+.notif.success{border-color:rgba(100,220,100,.4);color:#88FF88;}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- LOBBY -->
+<div id="scr-lobby" class="screen active">
+  <svg class="moon-svg" viewBox="0 0 100 100" fill="none">
+    <path d="M50 10 C28 10,10 28,10 50 C10 72,28 90,50 90 C38 82,30 66,32 50 C34 36,44 24,56 20 C54 16,52 12,50 10Z" fill="rgba(232,220,200,0.9)"/>
+    <circle cx="50" cy="50" r="42" stroke="rgba(232,220,200,0.15)" stroke-width="0.5" fill="none"/>
+  </svg>
+  <div class="title">MA SÓI</div>
+  <div class="subtitle">✦ Chơi Online ✦</div>
+  <div class="card">
+    <h2>⚔ Bước vào làng</h2>
+    <div class="ig"><label class="lbl">TÊN CỦA BẠN</label><input id="inp-name" class="inp" placeholder="Tên hiển thị..." maxlength="18" autocomplete="off"/></div>
+    <button class="btn-p" onclick="createRoom()">🏠 Tạo Phòng Mới</button>
+    <div class="divider">hoặc tham gia phòng có sẵn</div>
+    <div class="ig"><label class="lbl">MÃ PHÒNG</label><input id="inp-code" class="inp inp-code" placeholder="XXXXXX" maxlength="6" autocomplete="off"/></div>
+    <button class="btn-s" onclick="joinRoom()">🚪 Tham Gia Phòng</button>
+  </div>
+  <div class="hint">💡 Chia sẻ mã phòng để bạn bè tham gia từ bất kỳ thiết bị nào!</div>
+</div>
+
+<!-- ROOM -->
+<div id="scr-room" class="screen">
+  <div class="room-hd">
+    <div class="code-box">
+      <span class="code-lbl">MÃ PHÒNG (nhấn để sao chép)</span>
+      <span id="room-code" class="code-val" onclick="copyCode()">------</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="room-pc" style="font-size:12px;color:var(--silver)"></span>
+      <button class="btn-s btn-sm" onclick="leaveRoom()">← Rời</button>
+    </div>
+  </div>
+  <div class="room-body">
+    <div class="players-area">
+      <h2>👥 NGƯỜI CHƠI</h2>
+      <div id="room-grid" class="pgrid"></div>
+      <div id="room-wait" style="font-size:12px;color:var(--silver);margin-top:10px;"></div>
+    </div>
+    <div id="cfg-panel" class="cfg-panel">
+      <h3>⚙ Cài đặt vai trò <span style="font-size:10px;opacity:.5">(nhấn tên để xem)</span></h3>
+      <div id="cfg-roles"></div>
+      <div class="role-item" style="border-color:rgba(200,151,58,.2);">
+        <span class="rname">⏱ Thời gian thảo luận</span>
+        <select id="discuss-time-select" class="time-select">
+          <option value="60">1 phút</option>
+          <option value="120">2 phút</option>
+          <option value="180">3 phút</option>
+          <option value="240">4 phút</option>
+          <option value="300">5 phút</option>
+        </select>
+      </div>
+      <button id="start-btn" class="start-btn" onclick="startGame()" disabled>🌙 Bắt đầu</button>
+      <div id="start-msg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="scr-game" class="screen">
+  <div class="game-wrap">
+    <div id="phase-banner" class="phase-banner day">
+      <span id="phase-icon" class="ph-icon">☀️</span>
+      <div class="ph-info">
+        <div id="phase-title" class="ph-title">Ban Ngày</div>
+        <div id="phase-sub" class="ph-sub">Thảo luận!</div>
+      </div>
+      <div id="timer" class="timer"></div>
+      <button class="exit-btn" onclick="leaveGame()">✕</button>
+    </div>
+    <div class="game-grid">
+      <div class="stage">
+        <div>
+          <div class="section-hd">CÒN SỐNG (<span id="alive-cnt">0</span>)</div>
+          <div id="alive-list" class="gp-grid"></div>
+        </div>
+        <div class="dead-sec">
+          <div class="section-hd">ĐÃ CHẾT (<span id="dead-cnt">0</span>)</div>
+          <div id="dead-list" class="gp-grid"></div>
+        </div>
+      </div>
+      <div class="sidebar">
+        <div class="my-role-box">
+          <h4>VAI CỦA BẠN</h4>
+          <div class="role-pill">
+            <span id="my-role-icon" class="ri-icon">❓</span>
+            <div>
+              <div id="my-role-name" class="ri-name">Chưa rõ</div>
+              <div id="my-role-team" class="ri-team"></div>
+              <div id="my-role-ability" class="ri-ability"></div>
+            </div>
+          </div>
+        </div>
+        <div class="action-box">
+          <h4>HÀNH ĐỘNG</h4>
+          <div id="action-content"></div>
+        </div>
+        <div class="log-box">
+          <h4>📜 NHẬT KÝ</h4>
+          <div id="log-msgs" class="log-scroll"></div>
+        </div>
+      </div>
+    </div>
+    <div class="game-bottom">
+      <input id="chat-inp" class="chat-inp" placeholder="Nhắn tin với làng..." maxlength="120" autocomplete="off"/>
+      <button class="send-btn" onclick="sendChat()">Gửi →</button>
+    </div>
+  </div>
+</div>
+
+<!-- END -->
+<div id="scr-end" class="screen">
+  <div class="end-content">
+    <span id="end-trophy" class="end-trophy">🏆</span>
+    <div id="end-title" class="end-title"></div>
+    <div id="end-winners" class="end-winners"></div>
+    <div id="end-roles" class="end-roles"></div>
+    <button class="btn-p" style="max-width:260px;margin:0 auto;display:block" onclick="returnToLobby()">🏠 Về sảnh chờ</button>
+  </div>
+</div>
+</div><!-- #app -->
+
+<!-- MODALS -->
+<div id="role-modal" class="modal-bg">
+  <div class="modal">
+    <span id="reveal-icon" class="modal-icon">🎭</span>
+    <h2 id="reveal-name"></h2>
+    <div id="reveal-team" class="modal-team"></div>
+    <p id="reveal-desc"></p>
+    <div class="modal-btns"><button class="mbtn p" onclick="closeModal('role-modal')">Tôi đã hiểu ✓</button></div>
+  </div>
+</div>
+
+<div id="death-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">💀</span>
+    <h2>Bạn đã bị loại!</h2>
+    <p id="death-reason"></p>
+    <p id="death-role" style="color:var(--gold);font-size:14px;"></p>
+    <div class="modal-btns"><button class="mbtn s" onclick="closeModal('death-modal')">Tiếp tục xem</button></div>
+  </div>
+</div>
+
+<div id="vote-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">⚖</span>
+    <h2>Xác nhận bỏ phiếu</h2>
+    <p>Bạn muốn treo cổ <strong id="vote-confirm-name" style="color:var(--crimson)"></strong>?</p>
+    <div class="modal-btns">
+      <button class="mbtn p" onclick="confirmVote()">✓ Xác nhận</button>
+      <button class="mbtn s" onclick="closeModal('vote-modal')">✗ Hủy</button>
+    </div>
+  </div>
+</div>
+
+<div id="wolf-modal" class="modal-bg">
+  <div class="modal" style="max-width:500px">
+    <span class="modal-icon">🐺</span>
+    <h2>Ma Sói thức dậy!</h2>
+    <div id="wolf-pack-info" class="wolf-pack"></div>
+    <p style="margin-bottom:6px">Chọn nạn nhân (cần đa số bầy đồng ý):</p>
+    <div id="wolf-targets" class="targets-grid"></div>
+    <div style="margin:10px 0;padding:10px;background:rgba(139,0,0,.2);border-radius:8px;border:1px solid rgba(220,20,60,.2)">
+      <div style="font-size:10px;color:var(--silver);margin-bottom:4px;letter-spacing:.1em">PHIẾU CỦA BẦY:</div>
+      <div id="wolf-vote-status"><span style="opacity:.5;font-size:12px">Chưa ai chọn...</span></div>
+      <div id="wolf-consensus-label" style="font-size:13px;color:#88FF88;margin-top:6px;font-weight:600;"></div>
+    </div>
+    <div class="modal-btns">
+      <button id="wolf-confirm-btn" class="mbtn p" onclick="wolfConfirm()" disabled>🐺 Xác nhận chọn!</button>
+      <button class="mbtn s" onclick="closeModal('wolf-modal')">😴 Bỏ qua</button>
+    </div>
+  </div>
+</div>
+
+<div id="seer-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">🔮</span>
+    <h2>Tiên Tri thức dậy!</h2>
+    <p>Chọn người để xem bản chất (chỉ phát hiện Ma Sói):</p>
+    <div id="seer-targets" class="targets-grid"></div>
+    <div class="modal-btns"><button id="seer-confirm-btn" class="mbtn p" onclick="seerConfirm()" disabled>🔮 Nhìn thấu!</button></div>
+  </div>
+</div>
+
+<div id="seer-result-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">🔮</span>
+    <h2>Nhãn Thiên Lý Thấy...</h2>
+    <div id="seer-result-text" class="seer-result good"></div>
+    <div class="modal-btns"><button class="mbtn s" onclick="closeModal('seer-result-modal')">Đã hiểu</button></div>
+  </div>
+</div>
+
+<div id="witch-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">🧙‍♀️</span>
+    <h2>Phù Thủy thức dậy!</h2>
+    <p style="font-size:11px;color:#FFAA44;margin-bottom:8px;">⚠ Chỉ 1 bình cho cả game! Dùng để cứu HOẶC giết.</p>
+    <p id="witch-attacked-info" style="font-weight:600;margin-bottom:14px;"></p>
+    <div class="modal-btns" style="flex-direction:column;gap:8px;">
+      <button id="witch-save-btn" class="mbtn p" onclick="doWitchSave()">💊 Cứu người bị tấn công</button>
+      <button id="witch-kill-open-btn" class="mbtn s" onclick="showWitchKillModal()">☠ Dùng bình độc</button>
+      <button class="mbtn s" onclick="closeModal('witch-modal')">😴 Bỏ qua đêm nay</button>
+    </div>
+  </div>
+</div>
+
+<div id="witch-kill-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">☠</span>
+    <h2>Chọn mục tiêu đầu độc!</h2>
+    <p style="color:#FFAA44;font-size:12px;">Sau khi dùng, bình thuốc mất vĩnh viễn!</p>
+    <div id="witch-kill-targets" class="targets-grid"></div>
+    <div class="modal-btns">
+      <button id="witch-kill-confirm" class="mbtn p" disabled>☠ Đầu độc!</button>
+      <button class="mbtn s" onclick="closeModal('witch-kill-modal');openModal('witch-modal')">← Quay lại</button>
+    </div>
+  </div>
+</div>
+
+<div id="guard-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">🛡️</span>
+    <h2>Bảo Vệ thức dậy!</h2>
+    <p>Chọn 1 người bảo vệ khỏi sói. Không bảo vệ cùng người 2 đêm liên tiếp.</p>
+    <div id="guard-targets" class="targets-grid"></div>
+    <div class="modal-btns">
+      <button id="guard-confirm-btn" class="mbtn p" onclick="guardConfirm()" disabled>🛡️ Bảo vệ!</button>
+      <button class="mbtn s" onclick="closeModal('guard-modal')">😴 Bỏ qua</button>
+    </div>
+  </div>
+</div>
+
+<div id="vamp-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">🧛</span>
+    <h2>Ma Cà Rồng thức dậy!</h2>
+    <p>Chọn người hút máu. Nạn nhân chết sau bỏ phiếu ngày mai.</p>
+    <div id="vamp-targets" class="targets-grid"></div>
+    <div class="modal-btns">
+      <button id="vamp-confirm-btn" class="mbtn p" onclick="vampireConfirm()" disabled>🧛 Hút máu!</button>
+      <button class="mbtn s" onclick="closeModal('vamp-modal')">😴 Bỏ qua</button>
+    </div>
+  </div>
+</div>
+
+<div id="hunter-modal" class="modal-bg">
+  <div class="modal">
+    <span class="modal-icon">🏹</span>
+    <h2>Thợ Săn ra tay!</h2>
+    <p>Bạn sắp chết! Chọn ngay 1 người để bắn hạ trước khi chết!</p>
+    <div id="hunter-timer" style="font-size:32px;color:var(--crimson);text-align:center;font-weight:900;margin:8px 0;">10s</div>
+    <div id="hunter-targets" class="targets-grid"></div>
+    <div class="modal-btns"><button id="hunter-fire-btn" class="mbtn p" onclick="hunterFire()" disabled>🏹 Bắn!</button></div>
+  </div>
+</div>
+
+<div id="notif" class="notif"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ================================================================
+//  MA SÓI ONLINE - Client
+// ================================================================
+const ROLES = {
+  villager:{ id:'villager', name:'Dân Làng',    icon:'👨‍🌾', team:'village', desc:'Không có chức năng đặc biệt. Thắng khi loại bỏ hết kẻ thù.', ability:'Bỏ phiếu treo cổ ban ngày.' },
+  wolf:    { id:'wolf',     name:'Ma Sói',       icon:'🐺',  team:'wolf',    desc:'Mỗi đêm vote chọn nạn nhân cùng bầy. Thắng khi số sói ≥ số còn lại.', ability:'Đêm: vote chọn nạn nhân.' },
+  seer:    { id:'seer',     name:'Tiên Tri',     icon:'🔮',  team:'village', desc:'Mỗi đêm xem bản chất 1 người — có phải Ma Sói không.', ability:'Đêm: nhìn thấu 1 người.' },
+  witch:   { id:'witch',    name:'Phù Thủy',     icon:'🧙‍♀️', team:'village', desc:'1 bình thuốc duy nhất cả game: cứu người hoặc giết người.', ability:'1 lần/game: cứu hoặc giết.' },
+  hunter:  { id:'hunter',  name:'Thợ Săn',      icon:'🏹',  team:'village', desc:'Khi chết có 10 giây bắn hạ 1 người. Nếu không chọn kịp mất chức năng.', ability:'Khi chết: bắn 1 người (10 giây).' },
+  guard:   { id:'guard',   name:'Bảo Vệ',       icon:'🛡️',  team:'village', desc:'Mỗi đêm bảo vệ 1 người khỏi sói cắn. Không bảo vệ cùng người 2 đêm liên tiếp. Có thể tự bảo vệ.', ability:'Đêm: bảo vệ 1 người.' },
+  cursed:  { id:'cursed',  name:'Kẻ Bị Nguyền', icon:'😈',  team:'village', desc:'Ban đầu là dân làng. Nếu bị sói cắn sẽ biến thành Ma Sói thay vì chết.', ability:'Biến thành sói khi bị cắn.' },
+  bored:   { id:'bored',   name:'Kẻ Chán Đời',  icon:'😑',  team:'none',    desc:'Chỉ thắng khi bị làng treo cổ. Không thuộc phe nào.', ability:'Mục tiêu: bị làng treo cổ.' },
+  vampire: { id:'vampire', name:'Ma Cà Rồng',   icon:'🧛',  team:'none',    desc:'Mỗi đêm hút máu 1 người. Nạn nhân chết sau bỏ phiếu ngày hôm sau.', ability:'Đêm: hút máu (chết trì hoãn).' }
+};
+const ROLE_ORDER = ['wolf','vampire','guard','seer','witch','hunter','cursed','bored','villager'];
+const AVATARS = ['🐱','🦊','🐻','🦁','🐯','🐺','🦝','🐸','🦄','🐙','🦋','🐧','🦅','🐲','🦀','🐬','🦉','🐼','🦌','🐨'];
+
+let socket, myId, myName, myAvatar, myRole;
+let currentCode = '';
+let isHost      = false;
+let gameState   = null; // sanitized public state from server
+let pendingVoteTarget = null;
+let timerInterval = null;
+let roleConfig  = { wolf:1, seer:1, witch:1, hunter:1, guard:1, cursed:0, bored:0, vampire:0, villager:0 };
+
+// ---- SOCKET SETUP ----
+function initSocket() {
+  socket = io({ transports: ['websocket', 'polling'] });
+
+  socket.on('connect',    () => { myId = socket.id; });
+  socket.on('disconnect', () => notify('Mất kết nối server!', 'err'));
+  socket.on('ERR',        d  => notify(d.msg, 'err'));
+
+  socket.on('ROOM_JOINED', d => {
+    currentCode = d.code;
+    myId        = d.me.id;
+    isHost      = d.me.isHost;
+    updateRoomUI(d.room);
+    showScreen('room');
+    if (isHost) setupConfig();
+  });
+
+  socket.on('ROOM_UPDATE', d => updateRoomUI(d.room));
+
+  socket.on('YOUR_ROLE', d => {
+    myRole = d.role;
+    renderMyRole();
+    showRoleModal(d.role);
+  });
+
+  socket.on('CURSED_TURNED', d => {
+    myRole = 'wolf';
+    notify(d.msg, 'err');
+    renderMyRole();
+    showRoleModal('wolf');
+  });
+
+  socket.on('GAME_STARTED', d => {
+    gameState = d.gameState;
+    showScreen('game');
+    renderGameUI();
+  });
+
+  socket.on('PHASE_CHANGE', d => {
+    gameState = d.gameState;
+    renderPhase(d.phase);
+    renderGameUI();
+  });
+
+  socket.on('STATE_UPDATE', d => {
+    gameState = d.gameState;
+    renderGameUI();
+  });
+
+  socket.on('NIGHT_TURN', d => onNightTurn(d));
+
+  socket.on('WOLF_VOTE_UPDATE', d => updateWolfVoteUI(d));
+
+  socket.on('SEER_ANSWER', d => {
+    const txt = d.isEvil
+      ? `🐺 ${d.targetName} là MA SÓI!`
+      : `✅ ${d.targetName} là DÂN LÀNG (không phải sói).`;
+    document.getElementById('seer-result-text').textContent = txt;
+    document.getElementById('seer-result-text').className = 'seer-result ' + (d.isEvil ? 'evil' : 'good');
+    openModal('seer-result-modal');
+    appendLog(`🔮 ${txt}`, d.isEvil ? 'wolf' : 'day');
+  });
+
+  socket.on('YOU_DIED', d => {
+    const reasons = { wolf:'Bạn bị Ma Sói ăn thịt trong đêm.', vote:'Làng đã treo cổ bạn.', witch:'Bạn bị Phù Thủy đầu độc.', hunter:'Bạn bị Thợ Săn bắn.', night:'Bạn đã chết trong đêm.' };
+    document.getElementById('death-reason').textContent = reasons[d.reason] || 'Bạn đã bị loại!';
+    const r = ROLES[d.role];
+    document.getElementById('death-role').textContent = r ? `Vai của bạn: ${r.icon} ${r.name}` : '';
+    openModal('death-modal');
+  });
+
+  socket.on('HUNTER_TURN', d => showHunterModal(d.targets));
+
+  socket.on('LOG',      d => appendLog(d.msg, d.cls));
+  socket.on('CHAT_MSG', d => appendLog(`💬 ${d.from}: ${d.msg}`, 'chat'));
+
+  socket.on('GAME_OVER', d => showEndScreen(d));
+}
+
+// ---- LOBBY ----
+function createRoom() {
+  const name = document.getElementById('inp-name').value.trim();
+  if (!name) return notify('Hãy nhập tên!', 'err');
+  myName   = name;
+  myAvatar = AVATARS[name.charCodeAt(0) % AVATARS.length];
+  socket.emit('CREATE_ROOM', { name, avatar: myAvatar });
+}
+
+function joinRoom() {
+  const name = document.getElementById('inp-name').value.trim();
+  const code = document.getElementById('inp-code').value.trim().toUpperCase();
+  if (!name)          return notify('Hãy nhập tên!', 'err');
+  if (code.length !== 6) return notify('Mã phòng cần đúng 6 ký tự!', 'err');
+  myName   = name;
+  myAvatar = AVATARS[name.charCodeAt(0) % AVATARS.length];
+  socket.emit('JOIN_ROOM', { code, name, avatar: myAvatar });
+}
+
+function leaveRoom() {
+  socket.disconnect(); socket.connect();
+  gameState = null; myRole = null; isHost = false;
+  clearTimerUI(); showScreen('lobby');
+}
+
+function leaveGame() {
+  if (confirm('Bạn có chắc muốn thoát?')) leaveRoom();
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(currentCode).catch(() => {});
+  notify('Đã sao chép: ' + currentCode, 'ok');
+}
+
+// ---- ROOM UI ----
+function updateRoomUI(room) {
+  document.getElementById('room-code').textContent = room.code;
+  document.getElementById('room-pc').textContent   = room.players.length + ' người';
+  const g = document.getElementById('room-grid');
+  g.innerHTML = room.players.map(p => `
+    <div class="pcard ${p.id === room.hostId ? 'host' : ''} ${p.id === myId ? 'me' : ''}">
+      <div class="pavatar">${p.avatar}</div>
+      <div class="pname">${escH(p.name)}</div>
+      <div class="pbadge">${p.id === room.hostId ? '👑 Chủ phòng' : p.id === myId ? '(Bạn)' : '✦'}</div>
+    </div>`).join('');
+  const waitEl = document.getElementById('room-wait');
+  if (isHost) {
+    waitEl.textContent = 'Chia sẻ mã phòng cho bạn bè!';
+    document.getElementById('cfg-panel').style.display = '';
+    document.getElementById('start-btn').style.display = '';
+    updateStartBtn(room.players.length);
+  } else {
+    waitEl.textContent = 'Chờ chủ phòng bắt đầu...';
+    document.getElementById('cfg-panel').style.display = 'none';
+  }
+}
+
+function setupConfig() {
+  const c = document.getElementById('cfg-roles');
+  c.innerHTML = ROLE_ORDER.filter(r => r !== 'villager').map(rid => {
+    const r = ROLES[rid];
+    return `<div class="role-item" onclick="showRoleInfo('${rid}')" >
+      <span class="rname">${r.icon} ${r.name} <span style="font-size:10px;opacity:.4">ⓘ</span></span>
+      <div class="rcnt" onclick="event.stopPropagation()">
+        <button class="cbtn" onclick="adjRole('${rid}',-1)">−</button>
+        <span id="rc-${rid}">${roleConfig[rid]||0}</span>
+        <button class="cbtn" onclick="adjRole('${rid}',1)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showRoleInfo(rid) {
+  const r = ROLES[rid]; if (!r) return;
+  document.getElementById('reveal-icon').textContent = r.icon;
+  document.getElementById('reveal-name').textContent = r.name;
+  document.getElementById('reveal-desc').textContent = r.desc;
+  const tl = { village:'Dân Làng 🟦', wolf:'Ma Sói 🔴', none:'Trung Lập ⚫' };
+  const tc = { village:'#64B4FF', wolf:'#FF4444', none:'#AAAAAA' };
+  document.getElementById('reveal-team').textContent  = 'Phe: ' + (tl[r.team] || r.team);
+  document.getElementById('reveal-team').style.color  = tc[r.team] || '#CCC';
+  openModal('role-modal');
+}
+
+function adjRole(rid, d) {
+  if (!isHost) return;
+  let v = (roleConfig[rid]||0) + d;
+  if (rid === 'wolf' && v < 1) return;
+  roleConfig[rid] = Math.max(0, v);
+  const el = document.getElementById('rc-' + rid);
+  if (el) el.textContent = roleConfig[rid];
+  updateStartBtn(document.getElementById('room-pc').textContent.replace(/[^0-9]/g,'') * 1);
+}
+
+function updateStartBtn(np) {
+  const special = ROLE_ORDER.filter(r => r !== 'villager').reduce((s,r) => s + (roleConfig[r]||0), 0);
+  const w = roleConfig.wolf || 0;
+  const btn = document.getElementById('start-btn');
+  const msg = document.getElementById('start-msg');
+  if (!btn) return;
+  if (np < Math.max(4, w+2)) {
+    btn.disabled = true; btn.textContent = '🌙 Cần thêm người';
+    msg.textContent = `Cần ít nhất ${Math.max(4,w+2)} người.`;
+  } else if (special > np) {
+    btn.disabled = true; btn.textContent = '⚠ Quá nhiều vai';
+    msg.textContent = 'Giảm số vai đặc biệt xuống.';
+  } else {
+    btn.disabled = false; btn.textContent = '🌙 Bắt đầu Game';
+    msg.textContent = `${np} người · ${w} sói · ${np - special} dân làng`;
+  }
+}
+
+function startGame() {
+  if (!isHost) return;
+  const discussTime = parseInt(document.getElementById('discuss-time-select').value) || 60;
+  socket.emit('START_GAME', { code: currentCode, roleConfig, discussTime });
+}
+
+// ---- GAME RENDER ----
+function renderGameUI() {
+  if (!gameState) return;
+  const alive = gameState.players.filter(p => p.alive);
+  const dead  = gameState.players.filter(p => !p.alive);
+  document.getElementById('alive-cnt').textContent = alive.length;
+  document.getElementById('dead-cnt').textContent  = dead.length;
+  renderPlayerList('alive-list', alive, false);
+  renderPlayerList('dead-list',  dead,  true);
+  renderActionPanel();
+}
+
+function renderPlayerList(cid, players, isDead) {
+  const c = document.getElementById(cid); if (!c) return;
+  const me      = gameState.players.find(p => p.id === myId);
+  const amAlive = me && me.alive;
+  const phase   = gameState.phase;
+
+  c.innerHTML = players.map(p => {
+    const vc   = (p.votes > 0 && !isDead) ? `<span class="vcnt">${p.votes}</span>` : '';
+    const meTag= p.id === myId ? ' <span class="tag-me">Bạn</span>' : '';
+    // Role shown only to self; dead players show "— ẩn —" to others
+    const roleStr = p.id === myId && myRole ? (ROLES[myRole] ? `${ROLES[myRole].icon} ${ROLES[myRole].name}` : '') : '';
+    const roleDiv = roleStr ? `<div class="gp-role">${roleStr}</div>` : `<div class="gp-role" style="opacity:.22">— ẩn —</div>`;
+    let clickable = '';
+    if (amAlive && !isDead && p.id !== myId && phase === 'vote') clickable = 'can-target';
+    const onclick = clickable ? `onclick="castVote('${p.id}')"` : '';
+    return `<div class="gp ${isDead ? 'dead' : ''} ${clickable}" ${onclick} id="gpc-${p.id}">
+      ${vc}
+      <div class="gp-av">${p.avatar}</div>
+      <div class="gp-name">${escH(p.name)}${meTag}</div>
+      ${roleDiv}
+    </div>`;
+  }).join('');
+}
+
+function renderMyRole() {
+  if (!myRole) return;
+  const r = ROLES[myRole]; if (!r) return;
+  document.getElementById('my-role-icon').textContent    = r.icon;
+  document.getElementById('my-role-name').textContent    = r.name;
+  const tc = { village:'#64B4FF', wolf:'#FF4444', none:'#AAAAAA' };
+  document.getElementById('my-role-team').textContent    = 'Phe: ' + (r.team === 'village' ? 'Dân Làng' : r.team === 'wolf' ? 'Ma Sói' : 'Trung Lập');
+  document.getElementById('my-role-team').style.color    = tc[r.team] || '#CCC';
+  document.getElementById('my-role-ability').textContent = r.ability;
+}
+
+function renderActionPanel() {
+  const panel = document.getElementById('action-content'); if (!panel) return;
+  const me = gameState?.players.find(p => p.id === myId);
+  if (!me || !me.alive) { panel.innerHTML = '<span class="dim-text">Bạn đang quan sát...</span>'; return; }
+  const phase = gameState.phase;
+
+  if (phase === 'day') {
+    panel.innerHTML = '<span class="dim-text">Thảo luận để tìm ra Ma Sói!</span>';
+  } else if (phase === 'vote') {
+    const alive   = gameState.players.filter(p => p.alive).length;
+    const needed  = Math.floor(alive / 2) + 1;
+    const myVote  = gameState.votes ? gameState.votes[myId] : null;
+    const vname   = myVote ? (gameState.players.find(p => p.id === myVote)?.name || '') : '';
+    panel.innerHTML = `<div class="majority-indicator">Cần ≥ ${needed}/${alive} phiếu để treo cổ</div>`
+      + (vname ? `<span class="dim-text">Phiếu của bạn: <strong style="color:var(--crimson)">${escH(vname)}</strong></span>` : '<span class="dim-text">Nhấn vào người chơi để bỏ phiếu.</span>');
+  } else if (phase === 'night') {
+    const cur = gameState.currentNightRole;
+    const eff = (myRole === 'cursed' && gameState.cursedTurned?.includes(myId)) ? 'wolf' : myRole;
+    if (eff === cur || (eff === 'wolf' && cur === 'wolf')) {
+      panel.innerHTML = '<span class="dim-text" style="color:var(--gold)">✨ Đến lượt bạn hành động...</span>';
+    } else {
+      const w = { wolf:'🐺 Ma Sói đang thức...', vampire:'🧛 Ma Cà Rồng đang thức...', guard:'🛡️ Bảo Vệ đang thức...', seer:'🔮 Tiên Tri đang thức...', witch:'🧙‍♀️ Phù Thủy đang thức...' };
+      panel.innerHTML = `<span class="dim-text">${w[cur] || 'Đang chờ...'}</span>`;
+    }
+  }
+}
+
+function renderPhase(phase) {
+  const map = {
+    night: { icon:'🌙', title:'Màn Đêm',   sub:'Các vai đặc biệt đang hành động...', cls:'night' },
+    day:   { icon:'☀️', title:'Ban Ngày',   sub:'Thảo luận để tìm ra kẻ địch!',      cls:'day'   },
+    vote:  { icon:'⚖', title:'Bỏ Phiếu',  sub:'Nhấn vào người để bỏ phiếu!',       cls:'vote'  },
+  };
+  const m = map[phase] || map.day;
+  document.getElementById('phase-icon').textContent  = m.icon;
+  document.getElementById('phase-title').textContent = m.title;
+  document.getElementById('phase-sub').textContent   = m.sub;
+  document.getElementById('phase-banner').className  = 'phase-banner ' + m.cls;
+  document.body.className = phase === 'night' ? 'night-bg' : '';
+}
+
+// ---- TIMER (client display only) ----
+function startClientTimer(secs) {
+  clearTimerUI();
+  const end = Date.now() + secs * 1000;
+  const el  = document.getElementById('timer');
+  timerInterval = setInterval(() => {
+    const rem = Math.max(0, Math.round((end - Date.now()) / 1000));
+    if (el) { el.textContent = rem + 's'; el.className = 'timer' + (rem <= 10 ? ' warn' : ''); }
+    if (rem === 0) clearTimerUI();
+  }, 250);
+}
+function clearTimerUI() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  const el = document.getElementById('timer');
+  if (el) el.textContent = '';
+}
+
+// ---- NIGHT TURN HANDLERS ----
+let wolfSel=null, seerSel=null, vampireSel=null, guardSel=null;
+
+function onNightTurn(data) {
+  const role = data.role;
+  if (role === 'wolf')    showWolfModal(data);
+  else if (role === 'seer')    showSeerModal(data);
+  else if (role === 'witch')   showWitchModal(data);
+  else if (role === 'guard')   showGuardModal(data);
+  else if (role === 'vampire') showVampireModal(data);
+}
+
+function showWolfModal(data) {
+  wolfSel = null;
+  document.getElementById('wolf-pack-info').textContent = '🐺 Bầy sói: ' + data.pack;
+  const c = document.getElementById('wolf-targets'); c.innerHTML = '';
+  data.targets.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'target-btn';
+    b.textContent = `${t.avatar} ${t.name}`;
+    b.onclick = () => {
+      wolfSel = t.id;
+      document.querySelectorAll('#wolf-targets .target-btn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      document.getElementById('wolf-confirm-btn').disabled = false;
+      socket.emit('NIGHT_ACT', { code: currentCode, type: 'wolf', target: t.id });
+    };
+    c.appendChild(b);
+  });
+  document.getElementById('wolf-confirm-btn').disabled = true;
+  document.getElementById('wolf-vote-status').innerHTML = '<span style="opacity:.5;font-size:12px">Chưa ai chọn...</span>';
+  document.getElementById('wolf-consensus-label').textContent = '';
+  openModal('wolf-modal');
+}
+
+function updateWolfVoteUI(data) {
+  const container = document.getElementById('wolf-vote-status'); if (!container) return;
+  const lines = Object.entries(data.votes || {}).map(([wid, tid]) => {
+    const wp = gameState?.players.find(p => p.id === wid);
+    const tp = gameState?.players.find(p => p.id === tid);
+    if (!wp || !tp) return '';
+    const me = wid === myId ? ' (bạn)' : '';
+    return `<div style="font-size:12px;color:#FFA0A0">${wp.name}${me} → ${tp.name}</div>`;
+  }).filter(Boolean).join('');
+  container.innerHTML = lines || '<span style="opacity:.5;font-size:12px">Chưa ai chọn...</span>';
+  if (data.wolfTarget) {
+    const tp = gameState?.players.find(p => p.id === data.wolfTarget);
+    const lbl = document.getElementById('wolf-consensus-label');
+    if (lbl && tp) lbl.textContent = `✅ Đồng thuận: ${tp.name}`;
+  } else {
+    const lbl = document.getElementById('wolf-consensus-label');
+    if (lbl) lbl.textContent = '';
+  }
+}
+
+function wolfConfirm() {
+  if (!wolfSel) return;
+  socket.emit('NIGHT_ACT', { code: currentCode, type: 'wolf', target: wolfSel });
+  closeModal('wolf-modal');
+}
+
+function showSeerModal(data) {
+  seerSel = null;
+  const c = document.getElementById('seer-targets'); c.innerHTML = '';
+  data.targets.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'target-btn'; b.textContent = `${t.avatar} ${t.name}`;
+    b.onclick = () => {
+      seerSel = t.id;
+      document.querySelectorAll('#seer-targets .target-btn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      document.getElementById('seer-confirm-btn').disabled = false;
+    };
+    c.appendChild(b);
+  });
+  document.getElementById('seer-confirm-btn').disabled = true;
+  openModal('seer-modal');
+}
+
+function seerConfirm() {
+  if (!seerSel) return;
+  socket.emit('NIGHT_ACT', { code: currentCode, type: 'seer', target: seerSel });
+  closeModal('seer-modal');
+}
+
+function showWitchModal(data) {
+  const used = data.witchPotionUsed;
+  document.getElementById('witch-attacked-info').textContent = data.wasAttacked
+    ? '🩸 Sói đêm nay đã tấn công ai đó.'
+    : '✨ Sói không tấn công ai đêm nay.';
+  const sb = document.getElementById('witch-save-btn');
+  const kb = document.getElementById('witch-kill-open-btn');
+  if (sb) { sb.disabled = used || !data.wasAttacked; sb.textContent = used ? '💊 Đã dùng bình thuốc' : data.wasAttacked ? '💊 Cứu người bị tấn công' : '💊 Không có ai để cứu'; }
+  if (kb) { kb.disabled = used; kb.textContent = used ? '☠ Đã dùng bình thuốc' : '☠ Dùng bình độc (giết người)'; }
+  window._witchKillTargets = data.killTargets || [];
+  openModal('witch-modal');
+}
+
+function doWitchSave() {
+  socket.emit('WITCH_SAVE', { code: currentCode });
+  closeModal('witch-modal');
+  appendLog('🧙‍♀️ Bạn đã dùng bình cứu người.', 'night');
+}
+
+function showWitchKillModal() {
+  closeModal('witch-modal');
+  const targets = window._witchKillTargets || [];
+  const c = document.getElementById('witch-kill-targets'); c.innerHTML = '';
+  let sel = null;
+  targets.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'target-btn'; b.textContent = `${t.avatar} ${t.name}`;
+    b.onclick = () => {
+      sel = t.id;
+      document.querySelectorAll('#witch-kill-targets .target-btn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      document.getElementById('witch-kill-confirm').disabled = false;
+    };
+    c.appendChild(b);
+  });
+  document.getElementById('witch-kill-confirm').disabled = true;
+  document.getElementById('witch-kill-confirm').onclick = () => {
+    if (!sel) return;
+    socket.emit('WITCH_KILL', { code: currentCode, target: sel });
+    closeModal('witch-kill-modal');
+    appendLog('🧙‍♀️ Bạn đã dùng bình độc.', 'night');
+  };
+  openModal('witch-kill-modal');
+}
+
+function showGuardModal(data) {
+  guardSel = null;
+  const c = document.getElementById('guard-targets'); c.innerHTML = '';
+  const last = data.lastProtected;
+  data.targets.forEach(t => {
+    const isLast = t.id === last;
+    const b = document.createElement('button');
+    b.className = 'target-btn' + (isLast ? '' : '');
+    b.textContent = `${t.avatar} ${t.name}${isLast ? ' (đêm trước)' : ''}`;
+    b.disabled = isLast;
+    if (isLast) b.style.opacity = '.4';
+    else b.onclick = () => {
+      guardSel = t.id;
+      document.querySelectorAll('#guard-targets .target-btn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      document.getElementById('guard-confirm-btn').disabled = false;
+    };
+    c.appendChild(b);
+  });
+  document.getElementById('guard-confirm-btn').disabled = true;
+  openModal('guard-modal');
+}
+
+function guardConfirm() {
+  if (!guardSel) return;
+  socket.emit('GUARD_ACT', { code: currentCode, target: guardSel });
+  closeModal('guard-modal');
+  appendLog('🛡️ Bạn đã chọn người bảo vệ.', 'night');
+}
+
+function showVampireModal(data) {
+  vampireSel = null;
+  const c = document.getElementById('vamp-targets'); c.innerHTML = '';
+  data.targets.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'target-btn'; b.textContent = `${t.avatar} ${t.name}`;
+    b.onclick = () => {
+      vampireSel = t.id;
+      document.querySelectorAll('#vamp-targets .target-btn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      document.getElementById('vamp-confirm-btn').disabled = false;
+    };
+    c.appendChild(b);
+  });
+  document.getElementById('vamp-confirm-btn').disabled = true;
+  openModal('vamp-modal');
+}
+
+function vampireConfirm() {
+  if (!vampireSel) return;
+  socket.emit('NIGHT_ACT', { code: currentCode, type: 'vampire', target: vampireSel });
+  closeModal('vamp-modal');
+}
+
+// ---- HUNTER ----
+let hunterTimerIV = null;
+function showHunterModal(targets) {
+  const c = document.getElementById('hunter-targets'); c.innerHTML = '';
+  let sel = null;
+  targets.forEach(t => {
+    const b = document.createElement('button');
+    b.className = 'target-btn'; b.textContent = `${t.avatar} ${t.name}`;
+    b.onclick = () => {
+      sel = t.id;
+      document.querySelectorAll('#hunter-targets .target-btn').forEach(x => x.classList.remove('sel'));
+      b.classList.add('sel');
+      document.getElementById('hunter-fire-btn').disabled = false;
+    };
+    c.appendChild(b);
+  });
+  document.getElementById('hunter-fire-btn').disabled = true;
+  document.getElementById('hunter-fire-btn').onclick = () => {
+    if (!sel) return;
+    socket.emit('HUNTER_SHOT', { code: currentCode, target: sel });
+    clearInterval(hunterTimerIV);
+    closeModal('hunter-modal');
+  };
+  openModal('hunter-modal');
+  let rem = 10;
+  const te = document.getElementById('hunter-timer');
+  if (te) te.textContent = rem + 's';
+  hunterTimerIV = setInterval(() => {
+    rem--;
+    if (te) te.textContent = rem + 's';
+    if (rem <= 0) { clearInterval(hunterTimerIV); closeModal('hunter-modal'); }
+  }, 1000);
+}
+
+// ---- VOTE ----
+function castVote(targetId) {
+  if (!gameState || gameState.phase !== 'vote') return;
+  const me = gameState.players.find(p => p.id === myId);
+  if (!me || !me.alive) return;
+  document.getElementById('vote-confirm-name').textContent = gameState.players.find(p => p.id === targetId)?.name || '';
+  pendingVoteTarget = targetId;
+  openModal('vote-modal');
+}
+
+function confirmVote() {
+  if (!pendingVoteTarget) return;
+  socket.emit('VOTE_CAST', { code: currentCode, target: pendingVoteTarget });
+  closeModal('vote-modal');
+  pendingVoteTarget = null;
+}
+
+// ---- CHAT ----
+function sendChat() {
+  const inp = document.getElementById('chat-inp');
+  const msg = inp.value.trim(); if (!msg) return;
+  inp.value = '';
+  appendLog(`💬 ${myName} (bạn): ${msg}`, 'chat');
+  socket.emit('CHAT', { code: currentCode, msg });
+}
+
+// ---- END SCREEN ----
+function showRoleModal(role) {
+  const r = ROLES[role]; if (!r) return;
+  document.getElementById('reveal-icon').textContent = r.icon;
+  document.getElementById('reveal-name').textContent = r.name;
+  document.getElementById('reveal-desc').textContent = r.desc;
+  const tl = { village:'Dân Làng 🟦', wolf:'Ma Sói 🔴', none:'Trung Lập ⚫' };
+  const tc = { village:'#64B4FF', wolf:'#FF4444', none:'#AAAAAA' };
+  document.getElementById('reveal-team').textContent = 'Phe: ' + (tl[r.team] || r.team);
+  document.getElementById('reveal-team').style.color  = tc[r.team] || '#CCC';
+  openModal('role-modal');
+}
+
+function showEndScreen(data) {
+  clearTimerUI();
+  const t = { village:'🏆', wolf:'🐺', vampire:'🧛', bored:'😑' };
+  document.getElementById('end-trophy').textContent = t[data.winner] || '🏆';
+  document.getElementById('end-title').textContent  = data.msg || 'Trò chơi kết thúc!';
+  document.getElementById('end-winners').innerHTML  = (data.names||[]).map(n => `<span class="winner-chip">${n}</span>`).join('');
+  const rp = document.getElementById('end-roles');
+  if (data.allPlayers && rp) {
+    rp.innerHTML = data.allPlayers.map(p => {
+      const r = ROLES[p.role];
+      return `<div class="end-player ${p.alive ? 'alive' : 'dead'}">
+        <span>${p.avatar}</span><span style="flex:1">${escH(p.name)}</span>
+        <span>${r ? r.icon + ' ' + r.name : ''}</span>
+      </div>`;
+    }).join('');
+  }
+  showScreen('end');
+}
+
+function returnToLobby() {
+  gameState = null; myRole = null;
+  clearTimerUI(); showScreen('lobby');
+}
+
+// ---- HELPERS ----
+function appendLog(msg, cls='sys') {
+  const c = document.getElementById('log-msgs'); if (!c) return;
+  const d = document.createElement('div');
+  d.className = 'log-line ' + cls; d.textContent = msg;
+  c.appendChild(d); c.scrollTop = c.scrollHeight;
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const s = document.getElementById('scr-' + id);
+  if (s) s.classList.add('active');
+}
+
+function openModal(id)  { const m = document.getElementById(id); if (m) m.style.display = 'flex'; }
+function closeModal(id) { const m = document.getElementById(id); if (m) m.style.display = 'none'; }
+
+function escH(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+let notifTO = null;
+function notify(msg, type='') {
+  const el = document.getElementById('notif'); if (!el) return;
+  el.textContent = msg;
+  el.className = 'notif ' + (type==='err'?'error':type==='ok'?'success':'');
+  el.classList.add('show');
+  if (notifTO) clearTimeout(notifTO);
+  notifTO = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ---- KEYBOARD ----
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const scr = document.querySelector('.screen.active');
+    if (scr?.id === 'scr-lobby') {
+      document.getElementById('inp-code').value.trim() ? joinRoom() : createRoom();
+    } else if (scr?.id === 'scr-game') {
+      sendChat();
+    }
+  }
+});
+
+// ---- INIT ----
+initSocket();
+</script>
+</body>
+</html>
