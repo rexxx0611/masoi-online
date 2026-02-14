@@ -641,7 +641,11 @@ function initSocket() {
   socket.on('ROOM_JOINED', d => {
     currentCode=d.code; myId=d.me.id; isHost=d.me.isHost; myName=d.me.name; myAvatar=d.me.avatar;
     saveSession(d.code, d.me.name, d.me.avatar);
-    updateRoomUI(d.room); showScreen('room');
+    updateRoomUI(d.room); 
+    // Only show room screen if game hasn't started yet
+    if (!d.room.started) {
+      showScreen('room');
+    }
     if(isHost) setupConfig();
   });
   socket.on('ROOM_UPDATE', d => updateRoomUI(d.room));
@@ -652,7 +656,10 @@ function initSocket() {
   socket.on('GAME_STARTED', d => {
     gameState=d.gameState;
     clearLog(); clearTimerUI();
-    showScreen('game'); renderGameUI(); renderRoleInfoCol();
+    showScreen('game'); 
+    renderPhase(d.gameState.phase);
+    renderGameUI(); 
+    renderRoleInfoCol();
   });
   socket.on('PHASE_CHANGE', d => { gameState=d.gameState; renderPhase(d.phase); renderGameUI(); });
   socket.on('STATE_UPDATE', d => { gameState=d.gameState; renderGameUI(); });
