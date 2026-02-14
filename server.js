@@ -12,8 +12,10 @@ const app    = express();
 const server = http.createServer(app);
 const io     = new Server(server, {
   cors: { origin: '*', methods: ['GET', 'POST'] },
-  pingTimeout: 60000,
-  pingInterval: 25000
+  pingTimeout: 120000,
+  pingInterval: 30000,
+  maxHttpBufferSize: 1e6,
+  transports: ['websocket', 'polling']
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -122,8 +124,19 @@ io.on('connection', socket => {
       gs.players.forEach(p => {
         if (p.id) emit(p.id, 'YOUR_ROLE', { role: p.role });
       });
+      
+      // Ensure all players are in the socket room before broadcasting
+      gs.players.forEach(p => {
+        if (p.id && io.sockets.sockets.get(p.id)) {
+          io.sockets.sockets.get(p.id).join(code);
+        }
+      });
+      
       toRoom(code, 'GAME_STARTED', { gameState: pub(gs) });
-      setTimeout(() => beginNight(code), 2000);
+      
+      // Clear any existing timers and schedule night
+      clearRoomTimers(room);
+      room.timers.initial = setTimeout(() => beginNight(code), 1500);
     } catch (error) {
       console.error('Error starting game:', error);
       emit(socket.id, 'ERR', { msg: 'Lỗi bắt đầu trò chơi. Vui lòng thử lại!' });
@@ -239,91 +252,99 @@ function buildPool(cfg, total) {
 
 // ---- Night sequence ----
 function beginNight(code) {
-  const room = getRoom(code);
-  if (!room?.gameState) return;
-  const gs = room.gameState;
-  gs.phase         = 'night';
-  gs.nightActions  = {};
-  gs.nightDone     = {};
-  gs.wolfTarget    = null;
-  gs.wolfVotes     = {};
-  gs.hunterPending = false;
-  gs.currentNightRole = null;
-  clearRoomTimers(room);
+  try {
+    const room = getRoom(code);
+    if (!room?.gameState) return console.error('beginNight: room or gameState missing');
+    const gs = room.gameState;
+    gs.phase         = 'night';
+    gs.nightActions  = {};
+    gs.nightDone     = {};
+    gs.wolfTarget    = null;
+    gs.wolfVotes     = {};
+    gs.hunterPending = false;
+    gs.currentNightRole = null;
+    clearRoomTimers(room);
 
-  toRoom(code, 'PHASE_CHANGE', { phase: 'night', gameState: pub(gs) });
-  toRoom(code, 'LOG', { msg: `🌙 Đêm ${gs.round} bắt đầu...`, cls: 'night' });
-  scheduleNight(code, 0);
+    toRoom(code, 'PHASE_CHANGE', { phase: 'night', gameState: pub(gs) });
+    toRoom(code, 'LOG', { msg: `🌙 Đêm ${gs.round} bắt đầu...`, cls: 'night' });
+    scheduleNight(code, 0);
+  } catch (err) {
+    console.error('Error in beginNight:', err);
+  }
 }
 
 function scheduleNight(code, idx) {
-  const room = getRoom(code);
-  if (!room?.gameState) return;
-  const gs  = room.gameState;
-  const seq = NIGHT_SEQ;
-  if (idx >= seq.length) { resolveNight(code); return; }
+  try {
+    const room = getRoom(code);
+    if (!room?.gameState) return;
+    const gs  = room.gameState;
+    const seq = NIGHT_SEQ;
+    if (idx >= seq.length) { resolveNight(code); return; }
 
-  const role = seq[idx];
-  const secs = NIGHT_SECS[role];
-  const cfg  = gs.roleConfig;
+    const role = seq[idx];
+    const secs = NIGHT_SECS[role];
+    const cfg  = gs.roleConfig;
 
-  // Skip roles not configured in this game
-  const inGame = role === 'wolf' ? (cfg.wolf||0) > 0 : (cfg[role]||0) > 0;
-  if (!inGame) { scheduleNight(code, idx + 1); return; }
+    // Skip roles not configured in this game
+    const inGame = role === 'wolf' ? (cfg.wolf||0) > 0 : (cfg[role]||0) > 0;
+    if (!inGame) { scheduleNight(code, idx + 1); return; }
 
-  // Always announce (dead or alive) so players can't infer deaths from timing
-  const ann = {
-    wolf:'🐺 Ma Sói đang thức...', vampire:'🧛 Ma Cà Rồng đang thức...',
-    guard:'🛡️ Bảo Vệ đang thức...', seer:'🔮 Tiên Tri đang thức...',
-    witch:'🧙‍♀️ Phù Thủy đang thức...',
-  };
-  toRoom(code, 'LOG', { msg: ann[role], cls: 'night' });
-  gs.currentNightRole = role;
-  toRoom(code, 'STATE_UPDATE', { gameState: pub(gs) });
+    // Always announce (dead or alive) so players can't infer deaths from timing
+    const ann = {
+      wolf:'🐺 Ma Sói đang thức...', vampire:'🧛 Ma Cà Rồng đang thức...',
+      guard:'🛡️ Bảo Vệ đang thức...', seer:'🔮 Tiên Tri đang thức...',
+      witch:'🧙‍♀️ Phù Thủy đang thức...',
+    };
+    toRoom(code, 'LOG', { msg: ann[role], cls: 'night' });
+    gs.currentNightRole = role;
+    toRoom(code, 'STATE_UPDATE', { gameState: pub(gs) });
 
-  // Send NIGHT_TURN only to alive players with this role
-  const alive = alivePlayers(gs);
-  if (role === 'wolf') {
-    const wolves = alive.filter(p => isWolf(p, gs));
-    if (wolves.length > 0) {
-      const pack = wolves.map(w => w.name).join(', ');
-      wolves.forEach(w => {
-        const targets = alive.filter(t => t.id !== w.id).map(miniPlayer);
-        emit(w.id, 'NIGHT_TURN', { role: 'wolf', pack, targets });
-      });
+    // Send NIGHT_TURN only to alive players with this role
+    const alive = alivePlayers(gs);
+    if (role === 'wolf') {
+      const wolves = alive.filter(p => isWolf(p, gs));
+      if (wolves.length > 0) {
+        const pack = wolves.map(w => w.name).join(', ');
+        wolves.forEach(w => {
+          const targets = alive.filter(t => t.id !== w.id).map(miniPlayer);
+          emit(w.id, 'NIGHT_TURN', { role: 'wolf', pack, targets });
+        });
+      }
+    } else if (role === 'vampire') {
+      const actor = alive.find(p => p.role === 'vampire');
+      if (actor) {
+        const targets = alive.filter(p => p.id !== actor.id).map(miniPlayer);
+        emit(actor.id, 'NIGHT_TURN', { role: 'vampire', targets });
+      }
+    } else if (role === 'guard') {
+      const actor = alive.find(p => p.role === 'guard');
+      if (actor) {
+        const targets = alive.map(miniPlayer);
+        emit(actor.id, 'NIGHT_TURN', { role: 'guard', targets, lastProtected: gs.guardLastProtected });
+      }
+    } else if (role === 'seer') {
+      const actor = alive.find(p => p.role === 'seer');
+      if (actor) {
+        const targets = alive.filter(p => p.id !== actor.id).map(miniPlayer);
+        emit(actor.id, 'NIGHT_TURN', { role: 'seer', targets });
+      }
+    } else if (role === 'witch') {
+      const actor = alive.find(p => p.role === 'witch');
+      if (actor) {
+        const killTargets = alive.filter(p => p.id !== actor.id).map(miniPlayer);
+        emit(actor.id, 'NIGHT_TURN', {
+          role: 'witch', wasAttacked: !!gs.wolfTarget,
+          witchPotionUsed: gs.witchPotionUsed, killTargets
+        });
+      }
     }
-  } else if (role === 'vampire') {
-    const actor = alive.find(p => p.role === 'vampire');
-    if (actor) {
-      const targets = alive.filter(p => p.id !== actor.id).map(miniPlayer);
-      emit(actor.id, 'NIGHT_TURN', { role: 'vampire', targets });
-    }
-  } else if (role === 'guard') {
-    const actor = alive.find(p => p.role === 'guard');
-    if (actor) {
-      const targets = alive.map(miniPlayer);
-      emit(actor.id, 'NIGHT_TURN', { role: 'guard', targets, lastProtected: gs.guardLastProtected });
-    }
-  } else if (role === 'seer') {
-    const actor = alive.find(p => p.role === 'seer');
-    if (actor) {
-      const targets = alive.filter(p => p.id !== actor.id).map(miniPlayer);
-      emit(actor.id, 'NIGHT_TURN', { role: 'seer', targets });
-    }
-  } else if (role === 'witch') {
-    const actor = alive.find(p => p.role === 'witch');
-    if (actor) {
-      const killTargets = alive.filter(p => p.id !== actor.id).map(miniPlayer);
-      emit(actor.id, 'NIGHT_TURN', {
-        role: 'witch', wasAttacked: !!gs.wolfTarget,
-        witchPotionUsed: gs.witchPotionUsed, killTargets
-      });
-    }
+
+    room.timers.night = setTimeout(() => scheduleNight(code, idx + 1), secs * 1000);
+    // Broadcast timer so all clients can display countdown
+    toRoom(code, 'TIMER_START', { secs, label: ann[role] });
+  } catch (err) {
+    console.error('Error in scheduleNight:', err);
   }
-
-  room.timers.night = setTimeout(() => scheduleNight(code, idx + 1), secs * 1000);
-  // Broadcast timer so all clients can display countdown
-  toRoom(code, 'TIMER_START', { secs, label: ann[role] });
 }
 
 function processNightAct(code, sid, type, target) {
@@ -480,31 +501,39 @@ function afterHunterAct(code) {
 
 // ---- Day ----
 function beginDay(code) {
-  const room = getRoom(code);
-  const gs   = room?.gameState;
-  if (!gs) return;
-  gs.phase = 'day';
-  gs.votes = {};
-  gs.players.forEach(p => { p.votes = 0; });
-  toRoom(code, 'PHASE_CHANGE', { phase: 'day', gameState: pub(gs) });
-  const dt  = gs.discussTime || 60;
-  const lbl = `💬 Thảo luận! (${Math.floor(dt/60)} phút${dt%60 ? ` ${dt%60} giây`:''})`;
-  toRoom(code, 'LOG', { msg: lbl, cls: 'day' });
-  toRoom(code, 'TIMER_START', { secs: dt, label: '💬 Thảo luận' });
-  room.timers.day = setTimeout(() => beginVote(code), dt * 1000);
+  try {
+    const room = getRoom(code);
+    const gs   = room?.gameState;
+    if (!gs) return console.error('beginDay: gameState missing');
+    gs.phase = 'day';
+    gs.votes = {};
+    gs.players.forEach(p => { p.votes = 0; });
+    toRoom(code, 'PHASE_CHANGE', { phase: 'day', gameState: pub(gs) });
+    const dt  = gs.discussTime || 60;
+    const lbl = `💬 Thảo luận! (${Math.floor(dt/60)} phút${dt%60 ? ` ${dt%60} giây`:''})`.substring(0, 200);
+    toRoom(code, 'LOG', { msg: lbl, cls: 'day' });
+    toRoom(code, 'TIMER_START', { secs: dt, label: '💬 Thảo luận' });
+    room.timers.day = setTimeout(() => beginVote(code), dt * 1000);
+  } catch (err) {
+    console.error('Error in beginDay:', err);
+  }
 }
 
 function beginVote(code) {
-  const room = getRoom(code);
-  const gs   = room?.gameState;
-  if (!gs || gs.phase !== 'day') return;
-  gs.phase = 'vote';
-  gs.votes = {};
-  gs.players.forEach(p => { p.votes = 0; });
-  toRoom(code, 'PHASE_CHANGE', { phase: 'vote', gameState: pub(gs) });
-  toRoom(code, 'LOG', { msg: '⚖ Bỏ phiếu! (30 giây)', cls: 'vote' });
-  toRoom(code, 'TIMER_START', { secs: 30, label: '⚖ Bỏ phiếu' });
-  room.timers.vote = setTimeout(() => resolveVote(code), 30000);
+  try {
+    const room = getRoom(code);
+    const gs   = room?.gameState;
+    if (!gs || gs.phase !== 'day') return;
+    gs.phase = 'vote';
+    gs.votes = {};
+    gs.players.forEach(p => { p.votes = 0; });
+    toRoom(code, 'PHASE_CHANGE', { phase: 'vote', gameState: pub(gs) });
+    toRoom(code, 'LOG', { msg: '⚖ Bỏ phiếu! (30 giây)', cls: 'vote' });
+    toRoom(code, 'TIMER_START', { secs: 30, label: '⚖ Bỏ phiếu' });
+    room.timers.vote = setTimeout(() => resolveVote(code), 30000);
+  } catch (err) {
+    console.error('Error in beginVote:', err);
+  }
 }
 
 function processVote(code, sid, target) {
@@ -525,53 +554,57 @@ function processVote(code, sid, target) {
 }
 
 function resolveVote(code) {
-  const room = getRoom(code);
-  const gs   = room?.gameState;
-  if (!gs || gs.phase !== 'vote') return;
+  try {
+    const room = getRoom(code);
+    const gs   = room?.gameState;
+    if (!gs || gs.phase !== 'vote') return;
 
-  // Vampire delayed death after vote phase
-  if (gs.vampireDelayed) {
-    const v = gs.players.find(p => p.id === gs.vampireDelayed && p.alive);
-    if (v) {
-      doKill(code, v.id, 'night');
-      toRoom(code, 'LOG', { msg: `💀 ${v.name} đã chết sau khi bỏ phiếu!`, cls: 'death' });
+    // Vampire delayed death after vote phase
+    if (gs.vampireDelayed) {
+      const v = gs.players.find(p => p.id === gs.vampireDelayed && p.alive);
+      if (v) {
+        doKill(code, v.id, 'night');
+        toRoom(code, 'LOG', { msg: `💀 ${v.name} đã chết sau khi bỏ phiếu!`, cls: 'death' });
+      }
+      gs.vampireDelayed = null;
     }
-    gs.vampireDelayed = null;
-  }
 
-  const alive     = alivePlayers(gs);
-  const threshold = Math.floor(alive.length / 2) + 1;
-  let max = 0, exes = [];
-  alive.forEach(p => {
-    const v = p.votes || 0;
-    if (v > max)              { max = v; exes = [p]; }
-    else if (v === max && v > 0) exes.push(p);
-  });
+    const alive     = alivePlayers(gs);
+    const threshold = Math.floor(alive.length / 2) + 1;
+    let max = 0, exes = [];
+    alive.forEach(p => {
+      const v = p.votes || 0;
+      if (v > max)              { max = v; exes = [p]; }
+      else if (v === max && v > 0) exes.push(p);
+    });
 
-  if (max === 0 || exes.length > 1 || max < threshold) {
-    const reason = max === 0 ? 'Không ai bỏ phiếu.'
-      : exes.length > 1 ? 'Hòa phiếu.'
-      : `Chưa đủ đa số (${max}/${alive.length}, cần ${threshold}).`;
-    toRoom(code, 'LOG', { msg: `⚖ Không ai bị treo cổ. ${reason}`, cls: 'vote' });
+    if (max === 0 || exes.length > 1 || max < threshold) {
+      const reason = max === 0 ? 'Không ai bỏ phiếu.'
+        : exes.length > 1 ? 'Hòa phiếu.'
+        : `Chưa đủ đa số (${max}/${alive.length}, cần ${threshold}).`;
+      toRoom(code, 'LOG', { msg: `⚖ Không ai bị treo cổ. ${reason}`, cls: 'vote' });
+      toRoom(code, 'STATE_UPDATE', { gameState: pub(gs) });
+      if (checkWin(code)) return;
+      gs.round++; beginNight(code); return;
+    }
+
+    const topped = exes[0];
+    toRoom(code, 'LOG', { msg: `😵 ${topped.name} bị treo cổ với ${max}/${alive.length} phiếu!`, cls: 'death' });
+
+    if (topped.role === 'bored') {
+      const wm = `😑 ${topped.name} thắng! Kẻ Chán Đời được toại nguyện!`;
+      toRoom(code, 'LOG', { msg: wm, cls: 'win' });
+      doKill(code, topped.id, 'vote');
+      endGame(code, 'bored', [topped.name], wm, gs.players); return;
+    }
+
+    doKill(code, topped.id, 'vote');
     toRoom(code, 'STATE_UPDATE', { gameState: pub(gs) });
     if (checkWin(code)) return;
-    gs.round++; beginNight(code); return;
+    gs.round++; beginNight(code);
+  } catch (err) {
+    console.error('Error in resolveVote:', err);
   }
-
-  const topped = exes[0];
-  toRoom(code, 'LOG', { msg: `😵 ${topped.name} bị treo cổ với ${max}/${alive.length} phiếu!`, cls: 'death' });
-
-  if (topped.role === 'bored') {
-    const wm = `😑 ${topped.name} thắng! Kẻ Chán Đời được toại nguyện!`;
-    toRoom(code, 'LOG', { msg: wm, cls: 'win' });
-    doKill(code, topped.id, 'vote');
-    endGame(code, 'bored', [topped.name], wm, gs.players); return;
-  }
-
-  doKill(code, topped.id, 'vote');
-  toRoom(code, 'STATE_UPDATE', { gameState: pub(gs) });
-  if (checkWin(code)) return;
-  gs.round++; beginNight(code);
 }
 
 // ---- Win ----
