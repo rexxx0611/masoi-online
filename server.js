@@ -73,7 +73,6 @@ io.on('connection', socket => {
     if (!player) return emit(socket.id, 'ERR', { msg: 'Không tìm thấy người chơi trong phòng!' });
     
     // Update player's socket ID (for when they reconnect with a new socket)
-    const oldId = player.id;
     player.id = socket.id;
     socket.join(code);
     
@@ -81,10 +80,7 @@ io.on('connection', socket => {
     const key = `${code}-${playerName}`;
     playerSessions[key] = { roomCode: code, playerData: player };
     
-    // Send them their info and current state
-    emit(socket.id, 'ROOM_JOINED', { code, me: player, room: roomPublic(room) });
-    
-    // If game is ongoing, restore their game state
+    // If game is ongoing, restore their game state (don't show room screen)
     if (room.started && room.gameState) {
       const gamePlayer = room.gameState.players.find(p => p.name === playerName);
       if (gamePlayer) {
@@ -93,28 +89,42 @@ io.on('connection', socket => {
         emit(socket.id, 'GAME_STARTED', { gameState: pub(room.gameState) });
         emit(socket.id, 'PHASE_CHANGE', { phase: room.gameState.phase, gameState: pub(room.gameState) });
         appendLog(code, `✅ ${playerName} đã quay lại!`);
+        toRoom(code, 'STATE_UPDATE', { gameState: pub(room.gameState) });
       }
+    } else {
+      // Game hasn't started yet - show room screen
+      emit(socket.id, 'ROOM_JOINED', { code, me: player, room: roomPublic(room) });
+      toRoom(code, 'ROOM_UPDATE', { room: roomPublic(room) }, socket.id);
     }
-    
-    // Notify others
-    toRoom(code, 'ROOM_UPDATE', { room: roomPublic(room) }, socket.id);
   });
 
 
   // ---------- ROOM ACTIONS ----------
   socket.on('START_GAME', ({ code, roleConfig, discussTime }) => {
     const room = getRoom(code);
-    if (!room || room.hostId !== socket.id || room.started) return;
+    if (!room) return emit(socket.id, 'ERR', { msg: 'Phòng không tồn tại!' });
+    if (room.hostId !== socket.id) return emit(socket.id, 'ERR', { msg: 'Chỉ chủ phòng mới có thể bắt đầu!' });
+    if (room.started) return emit(socket.id, 'ERR', { msg: 'Game đã bắt đầu rồi!' });
     if (room.players.length < 4) return emit(socket.id, 'ERR', { msg: 'Cần ít nhất 4 người chơi!' });
 
-    const gs = buildGameState(room.players, roleConfig, discussTime || 60);
-    room.started   = true;
-    room.gameState = gs;
+    try {
+      const gs = buildGameState(room.players, roleConfig, discussTime || 60);
+      if (!gs || !gs.players || gs.players.length === 0) {
+        return emit(socket.id, 'ERR', { msg: 'Lỗi tạo trò chơi. Vui lòng thử lại!' });
+      }
+      room.started   = true;
+      room.gameState = gs;
 
-    // Send each player their secret role
-    gs.players.forEach(p => emit(p.id, 'YOUR_ROLE', { role: p.role }));
-    toRoom(code, 'GAME_STARTED', { gameState: pub(gs) });
-    setTimeout(() => beginNight(code), 2000);
+      // Send each player their secret role
+      gs.players.forEach(p => {
+        if (p.id) emit(p.id, 'YOUR_ROLE', { role: p.role });
+      });
+      toRoom(code, 'GAME_STARTED', { gameState: pub(gs) });
+      setTimeout(() => beginNight(code), 2000);
+    } catch (error) {
+      console.error('Error starting game:', error);
+      emit(socket.id, 'ERR', { msg: 'Lỗi bắt đầu trò chơi. Vui lòng thử lại!' });
+    }
   });
 
   // ---------- NIGHT ACTIONS ----------
