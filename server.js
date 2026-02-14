@@ -24,6 +24,8 @@ app.get('*', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html
 // ================================================================
 // rooms[code] = { code, hostId, players, started, gameState, timers:{} }
 const rooms = {};
+// Track players across reconnections: { playerKey -> { roomCode, playerData } }
+const playerSessions = {};
 
 function getRoom(code)    { return rooms[code]; }
 function roomOfSocket(sid){ return Object.values(rooms).find(r => r.players.some(p => p.id === sid)); }
@@ -60,6 +62,44 @@ io.on('connection', socket => {
     emit(socket.id, 'ROOM_JOINED', { code, me: player, room: roomPublic(room) });
     toRoom(code, 'ROOM_UPDATE', { room: roomPublic(room) }, socket.id);
   });
+
+  // ---------- RECONNECT ----------
+  socket.on('RECONNECT', ({ code, playerName }) => {
+    code = code.toUpperCase();
+    const room = getRoom(code);
+    if (!room) return emit(socket.id, 'ERR', { msg: 'Phòng không tồn tại!' });
+    
+    const player = room.players.find(p => p.name === playerName);
+    if (!player) return emit(socket.id, 'ERR', { msg: 'Không tìm thấy người chơi trong phòng!' });
+    
+    // Update player's socket ID (for when they reconnect with a new socket)
+    const oldId = player.id;
+    player.id = socket.id;
+    socket.join(code);
+    
+    // Update playerSessions for future reconnections
+    const key = `${code}-${playerName}`;
+    playerSessions[key] = { roomCode: code, playerData: player };
+    
+    // Send them their info and current state
+    emit(socket.id, 'ROOM_JOINED', { code, me: player, room: roomPublic(room) });
+    
+    // If game is ongoing, restore their game state
+    if (room.started && room.gameState) {
+      const gamePlayer = room.gameState.players.find(p => p.name === playerName);
+      if (gamePlayer) {
+        gamePlayer.id = socket.id; // Update socket ID in game state
+        emit(socket.id, 'YOUR_ROLE', { role: gamePlayer.role });
+        emit(socket.id, 'GAME_STARTED', { gameState: pub(room.gameState) });
+        emit(socket.id, 'PHASE_CHANGE', { phase: room.gameState.phase, gameState: pub(room.gameState) });
+        appendLog(code, `✅ ${playerName} đã quay lại!`);
+      }
+    }
+    
+    // Notify others
+    toRoom(code, 'ROOM_UPDATE', { room: roomPublic(room) }, socket.id);
+  });
+
 
   // ---------- ROOM ACTIONS ----------
   socket.on('START_GAME', ({ code, roleConfig, discussTime }) => {
@@ -144,7 +184,7 @@ io.on('connection', socket => {
       }
       toRoom(room.code, 'ROOM_UPDATE', { room: roomPublic(room) });
     }
-    // If game started, keep player in game (they may reconnect)
+    // If game started, KEEP player in game state (they may reconnect within ~5 minutes)
   });
 });
 
@@ -563,6 +603,7 @@ function isWolf(p, gs)  { return p.role==='wolf' || (p.role==='cursed' && gs.cur
 function alivePlayers(gs){ return gs.players.filter(p => p.alive); }
 function findAlive(gs, sid){ return gs.players.find(p => p.id === sid && p.alive); }
 function miniPlayer(p)  { return { id: p.id, name: p.name, avatar: p.avatar }; }
+function appendLog(code, msg, cls='sys') { toRoom(code, 'LOG', { msg, cls }); }
 
 // Public game state — never leak roles or sensitive info
 function pub(gs) {
