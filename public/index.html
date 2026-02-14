@@ -626,17 +626,36 @@ function getSession() {
 //  SOCKET
 // ----------------------------------------------------------------
 function initSocket() {
-  socket = io({ transports:['websocket','polling'] });
-  socket.on('connect',    () => { 
+  socket = io({ 
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: 10,
+    transports: ['websocket', 'polling']
+  });
+  
+  socket.on('connect', () => { 
     myId = socket.id;
+    console.log('Socket connected:', myId);
     // Try to reconnect to previous session if exists (even during gameplay)
     const sess = getSession();
     if (sess) {
+      console.log('Attempting RECONNECT to:', sess.code);
       socket.emit('RECONNECT', { code: sess.code, playerName: sess.playerName });
     }
   });
-  socket.on('disconnect', () => notify('Mất kết nối server!','err'));
-  socket.on('ERR',         d => notify(d.msg,'err'));
+  
+  socket.on('disconnect', (reason) => {
+    console.log('Socket disconnected:', reason);
+    notify('Mất kết nối server!','err');
+  });
+  
+  socket.on('connect_error', (error) => {
+    console.error('Connection error:', error);
+    notify('Lỗi kết nối: ' + (error.message || 'Unknown error'), 'err');
+  });
+  
+  socket.on('ERR', d => notify(d.msg,'err'));
 
   socket.on('ROOM_JOINED', d => {
     currentCode=d.code; myId=d.me.id; isHost=d.me.isHost; myName=d.me.name; myAvatar=d.me.avatar;
@@ -654,15 +673,46 @@ function initSocket() {
   socket.on('CURSED_TURNED', d => { myRole='wolf'; notify(d.msg,'err'); renderMyRole(); showRoleModal('wolf'); });
 
   socket.on('GAME_STARTED', d => {
-    gameState=d.gameState;
-    clearLog(); clearTimerUI();
-    showScreen('game'); 
-    renderPhase(d.gameState.phase);
-    renderGameUI(); 
-    renderRoleInfoCol();
+    try {
+      if (!d.gameState) {
+        console.error('GAME_STARTED: missing gameState', d);
+        return;
+      }
+      gameState=d.gameState;
+      clearLog(); clearTimerUI();
+      showScreen('game'); 
+      renderPhase(d.gameState.phase);
+      renderGameUI(); 
+      renderRoleInfoCol();
+    } catch (e) {
+      console.error('Error in GAME_STARTED handler:', e);
+    }
   });
-  socket.on('PHASE_CHANGE', d => { gameState=d.gameState; renderPhase(d.phase); renderGameUI(); });
-  socket.on('STATE_UPDATE', d => { gameState=d.gameState; renderGameUI(); });
+  socket.on('PHASE_CHANGE', d => { 
+    try {
+      if (!d.gameState) {
+        console.error('PHASE_CHANGE: missing gameState', d);
+        return;
+      }
+      gameState=d.gameState; 
+      renderPhase(d.phase); 
+      renderGameUI();
+    } catch (e) {
+      console.error('Error in PHASE_CHANGE handler:', e);
+    }
+  });
+  socket.on('STATE_UPDATE', d => { 
+    try {
+      if (!d.gameState) {
+        console.error('STATE_UPDATE: missing gameState', d);
+        return;
+      }
+      gameState=d.gameState; 
+      renderGameUI();
+    } catch (e) {
+      console.error('Error in STATE_UPDATE handler:', e);
+    }
+  });
 
   // FIX 2: server-synced timer
   socket.on('TIMER_START', d => startClientTimer(d.secs));
