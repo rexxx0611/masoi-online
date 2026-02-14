@@ -1,2 +1,5 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+node_modules/
+npm-debug.log
+.env
+*.log
+.DS_Store
