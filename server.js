@@ -269,6 +269,8 @@ function scheduleNight(code, idx) {
   }
 
   room.timers.night = setTimeout(() => scheduleNight(code, idx + 1), secs * 1000);
+  // Broadcast timer so all clients can display countdown
+  toRoom(code, 'TIMER_START', { secs, label: ann[role] });
 }
 
 function processNightAct(code, sid, type, target) {
@@ -435,6 +437,7 @@ function beginDay(code) {
   const dt  = gs.discussTime || 60;
   const lbl = `💬 Thảo luận! (${Math.floor(dt/60)} phút${dt%60 ? ` ${dt%60} giây`:''})`;
   toRoom(code, 'LOG', { msg: lbl, cls: 'day' });
+  toRoom(code, 'TIMER_START', { secs: dt, label: '💬 Thảo luận' });
   room.timers.day = setTimeout(() => beginVote(code), dt * 1000);
 }
 
@@ -447,6 +450,7 @@ function beginVote(code) {
   gs.players.forEach(p => { p.votes = 0; });
   toRoom(code, 'PHASE_CHANGE', { phase: 'vote', gameState: pub(gs) });
   toRoom(code, 'LOG', { msg: '⚖ Bỏ phiếu! (30 giây)', cls: 'vote' });
+  toRoom(code, 'TIMER_START', { secs: 30, label: '⚖ Bỏ phiếu' });
   room.timers.vote = setTimeout(() => resolveVote(code), 30000);
 }
 
@@ -567,6 +571,7 @@ function pub(gs) {
     currentNightRole: gs.currentNightRole,
     witchPotionUsed: gs.witchPotionUsed,
     discussTime: gs.discussTime,
+    roleConfig: gs.roleConfig, // safe to share — just counts, not assignments
     players: gs.players.map(p => ({
       id: p.id, name: p.name, avatar: p.avatar,
       alive: p.alive, votes: p.votes, isHost: p.isHost
