@@ -26,8 +26,6 @@ app.get('*', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html
 // ================================================================
 // rooms[code] = { code, hostId, players, started, gameState, timers:{} }
 const rooms = {};
-// Track players across reconnections: { playerKey -> { roomCode, playerData } }
-const playerSessions = {};
 
 function getRoom(code)    { return rooms[code]; }
 function roomOfSocket(sid){ return Object.values(rooms).find(r => r.players.some(p => p.id === sid)); }
@@ -65,44 +63,6 @@ io.on('connection', socket => {
     toRoom(code, 'ROOM_UPDATE', { room: roomPublic(room) }, socket.id);
   });
 
-  // ---------- RECONNECT ----------
-  socket.on('RECONNECT', ({ code, playerName }) => {
-    code = code.toUpperCase();
-    const room = getRoom(code);
-    if (!room) return emit(socket.id, 'ERR', { msg: 'Phòng không tồn tại!' });
-    
-    const player = room.players.find(p => p.name === playerName);
-    if (!player) return emit(socket.id, 'ERR', { msg: 'Không tìm thấy người chơi trong phòng!' });
-    
-    // Update player's socket ID (for when they reconnect with a new socket)
-    player.id = socket.id;
-    socket.join(code);
-    
-    // Update playerSessions for future reconnections
-    const key = `${code}-${playerName}`;
-    playerSessions[key] = { roomCode: code, playerData: player };
-    
-    // If game is ongoing, restore their game state (don't show room screen)
-    if (room.started && room.gameState) {
-      const gamePlayer = room.gameState.players.find(p => p.name === playerName);
-      if (gamePlayer) {
-        gamePlayer.id = socket.id; // Update socket ID in game state
-        emit(socket.id, 'YOUR_ROLE', { role: gamePlayer.role });
-        emit(socket.id, 'GAME_STARTED', { gameState: pub(room.gameState) });
-        emit(socket.id, 'PHASE_CHANGE', { phase: room.gameState.phase, gameState: pub(room.gameState) });
-        appendLog(code, `✅ ${playerName} đã quay lại!`);
-        toRoom(code, 'STATE_UPDATE', { gameState: pub(room.gameState) });
-      } else {
-        // Player in room.players but not in gameState.players - this shouldn't happen
-        return emit(socket.id, 'ERR', { msg: 'Lỗi khôi phục game.' });
-      }
-    } else {
-      // Game hasn't started yet - show room screen
-      emit(socket.id, 'ROOM_JOINED', { code, me: player, room: roomPublic(room) });
-      toRoom(code, 'ROOM_UPDATE', { room: roomPublic(room) }, socket.id);
-    }
-  });
-
 
   // ---------- ROOM ACTIONS ----------
   socket.on('START_GAME', ({ code, roleConfig, discussTime }) => {
@@ -119,19 +79,10 @@ io.on('connection', socket => {
       }
       room.started   = true;
       room.gameState = gs;
-
-      // Send each player their secret role
-      gs.players.forEach(p => {
-        if (p.id) emit(p.id, 'YOUR_ROLE', { role: p.role });
-      });
       
-      // Ensure all players are in the socket room before broadcasting
-      gs.players.forEach(p => {
-        if (p.id && io.sockets.sockets.get(p.id)) {
-          io.sockets.sockets.get(p.id).join(code);
-        }
-      });
-      
+      // Send each player their secret role first (private)
+      gs.players.forEach(p => { if (p.id) emit(p.id, 'YOUR_ROLE', { role: p.role }); });
+      // Then broadcast GAME_STARTED to everyone — shows game screen
       toRoom(code, 'GAME_STARTED', { gameState: pub(gs) });
       
       // Clear any existing timers and schedule night
