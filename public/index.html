@@ -226,7 +226,7 @@ button,input,select,textarea{font-family:var(--font);}
     <button class="btn-s" id="btn-join">🚪 Tham Gia Phòng</button>
   </div>
   <div class="hint">💡 Chia sẻ mã phòng để bạn bè tham gia từ bất kỳ thiết bị — Safari, Chrome đều chơi được!
-    Game này được code bởi rex khong biet choi ma soi ^^ v1.12 </div>
+    Game này được code bởi rex khong biet choi ma soi ^^ </div>
 </div>
 
 <!-- ROOM -->
@@ -350,10 +350,9 @@ button,input,select,textarea{font-family:var(--font);}
     <div id="end-winners" class="end-winners"></div>
     <div id="end-roles" class="end-roles"></div>
     <div style="display:flex;gap:10px;justify-content:center;align-items:center;margin-top:8px;">
-      <button class="btn-p" id="btn-play-again" style="max-width:220px;">🔁 Chơi lại</button>
+      
       <button class="btn-p" id="btn-return" style="max-width:220px;">🏠 Về sảnh chờ</button>
     </div>
-    <div id="play-again-status" style="text-align:center;margin-top:10px;font-size:13px;color:var(--silver)"></div>
   </div>
 </div>
 </div>
@@ -567,13 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $('btn-vamp-skip').addEventListener('click', () => closeModal('vamp-modal'));
   $('hunter-fire-btn').addEventListener('click', hunterFire);
   $('btn-return').addEventListener('click', returnToLobby);
-  // End screen: play again
-  const pa=document.getElementById('btn-play-again'); if(pa) pa.addEventListener('click', ()=>{
-    if(!currentCode) return notify('Không có mã phòng','err');
-    socket.emit('PLAY_AGAIN',{code:currentCode});
-    pa.disabled=true; pa.textContent='🔁 Đã sẵn sàng';
-    const st=$('play-again-status'); if(st) st.textContent='Bạn đã chọn chơi lại — chờ chủ phòng.';
-  });
+
 
   // Close modal on backdrop tap
   document.querySelectorAll('.modal-bg').forEach(bg => {
@@ -602,75 +595,42 @@ function onGridClick(e) {
 }
 document.addEventListener('touchstart', () => { _touchScrolled = false; }, { passive:true });
 
-// ----------------------------------------------------------------
-//  STORAGE & SESSION
-// ----------------------------------------------------------------
-function saveSession(code, playerName, avatar) {
-  localStorage.setItem('masoi_session', JSON.stringify({ code, playerName, avatar, timestamp: Date.now() }));
-}
-function clearSession() {
-  localStorage.removeItem('masoi_session');
-}
-function getSession() {
-  const s = localStorage.getItem('masoi_session');
-  if (!s) return null;
-  try {
-    const sess = JSON.parse(s);
-    // Only restore if within 5 minutes
-    if (Date.now() - sess.timestamp > 5 * 60 * 1000) return null;
-    return sess;
-  } catch(e) { return null; }
-}
+
 
 // ----------------------------------------------------------------
 //  SOCKET
 // ----------------------------------------------------------------
 function initSocket() {
-  socket = io({ 
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    reconnectionAttempts: 10,
-    transports: ['websocket', 'polling']
-  });
+  socket = io({ transports: ['websocket', 'polling'] });
   
-  socket.on('connect', () => { 
-    myId = socket.id;
-    console.log('Socket connected:', myId);
-    // Try to reconnect to previous session if exists (even during gameplay)
-    const sess = getSession();
-    if (sess) {
-      console.log('Attempting RECONNECT to:', sess.code);
-      socket.emit('RECONNECT', { code: sess.code, playerName: sess.playerName });
-    }
-  });
+  socket.on('connect', () => { myId = socket.id; });
   
-  socket.on('disconnect', (reason) => {
-    console.log('Socket disconnected:', reason);
-    notify('Mất kết nối server!','err');
-  });
-  
-  socket.on('connect_error', (error) => {
-    console.error('Connection error:', error);
-    notify('Lỗi kết nối: ' + (error.message || 'Unknown error'), 'err');
-  });
+  socket.on('disconnect', () => notify('Mất kết nối!', 'err'));
   
   socket.on('ERR', d => notify(d.msg,'err'));
 
   socket.on('ROOM_JOINED', d => {
-    currentCode=d.code; myId=d.me.id; isHost=d.me.isHost; myName=d.me.name; myAvatar=d.me.avatar;
-    saveSession(d.code, d.me.name, d.me.avatar);
-    updateRoomUI(d.room); 
-    // Only show room screen if game hasn't started yet
-    if (!d.room.started) {
-      showScreen('room');
-    }
-    if(isHost) setupConfig();
+    currentCode = d.code; myId = d.me.id; isHost = d.me.isHost;
+    myName = d.me.name; myAvatar = d.me.avatar;
+    updateRoomUI(d.room);
+    showScreen('room');
+    if (isHost) setupConfig();
   });
   socket.on('ROOM_UPDATE', d => updateRoomUI(d.room));
 
-  socket.on('YOUR_ROLE', d => { myRole=d.role; renderMyRole(); showRoleModal(d.role); });
-  socket.on('CURSED_TURNED', d => { myRole='wolf'; notify(d.msg,'err'); renderMyRole(); showRoleModal('wolf'); });
+  socket.on('YOUR_ROLE', d => { 
+    myRole=d.role; 
+    renderMyRole(); 
+    // Delay showing modal to ensure game screen is fully rendered
+    setTimeout(() => showRoleModal(d.role), 100);
+  });
+  socket.on('CURSED_TURNED', d => { 
+    myRole='wolf'; 
+    notify(d.msg,'err'); 
+    renderMyRole(); 
+    // Delay showing modal to ensure context is clear
+    setTimeout(() => showRoleModal('wolf'), 100);
+  });
 
   socket.on('GAME_STARTED', d => {
     try {
@@ -738,12 +698,6 @@ function initSocket() {
   socket.on('LOG',      d => appendLog(d.msg, d.cls));
   socket.on('CHAT_MSG', d => appendLog(`💬 ${d.from}: ${d.msg}`, 'chat'));
   socket.on('GAME_OVER',d => showEndScreen(d));
-  socket.on('PLAY_AGAIN_UPDATE', d => {
-    // d.ready: array of player names or ids who opted in
-    const st=$('play-again-status'); const pa=$('btn-play-again');
-    if(st) st.textContent = d.msg || (d.ready&&d.ready.length?`${d.ready.length} người đã sẵn sàng chơi lại`:'Chưa ai chọn chơi lại');
-    if(d.youReady && pa){ pa.disabled=true; pa.textContent='🔁 Đã sẵn sàng'; }
-  });
 }
 
 // ----------------------------------------------------------------
@@ -761,7 +715,7 @@ function joinRoom(){
   myName=name; myAvatar=AVATARS[name.charCodeAt(0)%AVATARS.length];
   socket.emit('JOIN_ROOM',{code,name,avatar:myAvatar});
 }
-function leaveRoom(){ clearSession(); socket.disconnect(); socket.connect(); gameState=null; myRole=null; isHost=false; clearTimerUI(); showScreen('lobby'); }
+function leaveRoom(){ socket.disconnect(); socket.connect(); gameState=null; myRole=null; isHost=false; clearTimerUI(); showScreen('lobby'); }
 function leaveGame(){ if(confirm('Bạn có chắc muốn thoát?')) leaveRoom(); }
 function copyCode(){
   if(navigator.clipboard) navigator.clipboard.writeText(currentCode).catch(()=>{});
@@ -1104,13 +1058,10 @@ function showEndScreen(d){
   $('end-winners').innerHTML=(d.names||[]).map(n=>`<span class="winner-chip">${escH(n)}</span>`).join('');
   const rp=$('end-roles');
   if(d.allPlayers&&rp) rp.innerHTML=d.allPlayers.map(p=>{ const r=ROLES[p.role]; return `<div class="end-player ${p.alive?'':'dead'}"><span>${p.avatar}</span><span style="flex:1">${escH(p.name)}</span><span>${r?r.icon+' '+r.name:''}</span></div>`; }).join('');
-  // Reset play-again UI
-  const pa=$('btn-play-again'), st=$('play-again-status');
-  if(pa){ pa.disabled=false; pa.textContent='🔁 Chơi lại'; }
-  if(st){ st.textContent = d.playAgain && d.playAgain.length ? `${d.playAgain.length} người đã chọn chơi lại` : '' }
+
   showScreen('end');
 }
-function returnToLobby(){ clearSession(); gameState=null; myRole=null; clearTimerUI(); showScreen('lobby'); }
+function returnToLobby(){ gameState=null; myRole=null; clearTimerUI(); showScreen('lobby'); }
 
 // ----------------------------------------------------------------
 //  UTILS
